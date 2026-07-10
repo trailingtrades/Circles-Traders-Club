@@ -5,7 +5,7 @@ import { startOfToday } from "@/lib/student-filters";
 
 export const metadata: Metadata = { title: "Admin Dashboard" };
 
-function StatCard({ label, value, tone }: { label: string; value: number; tone: string }) {
+function StatCard({ label, value, tone }: { label: string; value: string | number; tone: string }) {
   return (
     <div className="card p-5">
       <p className="label">{label}</p>
@@ -13,6 +13,8 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
     </div>
   );
 }
+
+const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
 export default async function AdminDashboard() {
   const today = startOfToday();
@@ -38,6 +40,14 @@ export default async function AdminDashboard() {
       prisma.session.count({ where: { studentId: { not: null }, expiresAt: { gt: new Date() } } }),
     ]);
 
+  // Fee totals: received = sum of all payments; due = per-student shortfall.
+  const feeRows = await prisma.student.findMany({
+    select: { feeTotal: true, feePaid: true },
+  });
+  const feesReceived = feeRows.reduce((sum, s) => sum + s.feePaid, 0);
+  const feesDue = feeRows.reduce((sum, s) => sum + Math.max(0, s.feeTotal - s.feePaid), 0);
+  const dueCount = feeRows.filter((s) => s.feeTotal > s.feePaid).length;
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-ink-900 dark:text-white">Dashboard</h1>
@@ -50,6 +60,20 @@ export default async function AdminDashboard() {
         <StatCard label="Disabled / Revoked" value={disabled} tone="text-ink-500 dark:text-ink-400" />
         <StatCard label="New (7 days)" value={newThisWeek} tone="text-blue-600 dark:text-blue-400" />
         <StatCard label="Expiring ≤ 7 days" value={expiringSoon} tone="text-amber-600 dark:text-amber-400" />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="Fees received" value={inr(feesReceived)} tone="text-emerald-600 dark:text-emerald-400" />
+        <StatCard label="Fees due" value={inr(feesDue)} tone={feesDue > 0 ? "text-red-600 dark:text-red-400" : "text-ink-900 dark:text-white"} />
+        <div className="card p-5">
+          <p className="label">Students with payment due</p>
+          <p className="text-3xl font-extrabold text-ink-900 dark:text-white">{dueCount}</p>
+          {dueCount > 0 && (
+            <Link href="/admin/students?status=due" className="mt-1 inline-block text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400">
+              View defaulters →
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">

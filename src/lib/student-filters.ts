@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
 // Dates are stored at local midnight; a subscription is valid through the end
 // of its end date, so "not expired" ⇔ subscriptionEnd >= start of today.
@@ -10,7 +11,7 @@ export function startOfToday(): Date {
 
 export function buildStudentWhere(params: {
   q?: string;
-  status?: "all" | "active" | "expired" | "disabled" | "revoked";
+  status?: "all" | "active" | "expired" | "disabled" | "revoked" | "due";
 }): Prisma.StudentWhereInput {
   const where: Prisma.StudentWhereInput = {};
   const today = startOfToday();
@@ -37,6 +38,10 @@ export function buildStudentWhere(params: {
       break;
     case "revoked":
       where.status = "REVOKED";
+      break;
+    case "due":
+      // Students who still owe money: feeTotal > feePaid
+      where.feeTotal = { gt: prisma.student.fields.feePaid };
       break;
   }
   return where;

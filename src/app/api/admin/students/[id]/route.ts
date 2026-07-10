@@ -63,6 +63,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
     if (body.subscriptionStart !== undefined) data.subscriptionStart = parseDateOnly(body.subscriptionStart);
     if (body.subscriptionEnd !== undefined) data.subscriptionEnd = parseDateOnly(body.subscriptionEnd);
+    if (body.feeTotal !== undefined) data.feeTotal = body.feeTotal;
+    if (body.feePaid !== undefined) data.feePaid = body.feePaid;
     if (body.password) data.passwordHash = await hashPassword(body.password);
 
     const newStart = (data.subscriptionStart as Date) ?? student.subscriptionStart;

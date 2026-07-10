@@ -61,6 +61,8 @@ export default async function EditStudentPage({ params }: { params: Promise<{ id
               courseId: student.courseId ?? "",
               subscriptionStart: formatDateOnly(student.subscriptionStart),
               subscriptionEnd: formatDateOnly(student.subscriptionEnd),
+              feeTotal: student.feeTotal,
+              feePaid: student.feePaid,
               notes: student.notes ?? "",
             }}
           />
