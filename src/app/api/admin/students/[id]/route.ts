@@ -21,6 +21,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       where: { id },
       include: {
         course: { select: { id: true, name: true } },
+        materialGrants: { select: { materialId: true } },
         sessions: {
           select: { id: true, ip: true, device: true, browser: true, lastActiveAt: true, createdAt: true },
           orderBy: { lastActiveAt: "desc" },
@@ -65,6 +66,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body.subscriptionEnd !== undefined) data.subscriptionEnd = parseDateOnly(body.subscriptionEnd);
     if (body.feeTotal !== undefined) data.feeTotal = body.feeTotal;
     if (body.feePaid !== undefined) data.feePaid = body.feePaid;
+    if (body.materialAccess !== undefined) data.materialAccess = body.materialAccess;
     if (body.password) data.passwordHash = await hashPassword(body.password);
 
     const newStart = (data.subscriptionStart as Date) ?? student.subscriptionStart;
@@ -72,6 +74,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (newEnd < newStart) return jsonError(400, "Subscription end date must be after the start date");
 
     const updated = await prisma.student.update({ where: { id }, data });
+
+    // Replace the custom-grant set when a selection is provided.
+    if (body.materialIds !== undefined) {
+      const validIds = await prisma.material.findMany({
+        where: { id: { in: body.materialIds } },
+        select: { id: true },
+      });
+      await prisma.$transaction([
+        prisma.studentMaterialAccess.deleteMany({ where: { studentId: id } }),
+        prisma.studentMaterialAccess.createMany({
+          data: validIds.map((m) => ({ studentId: id, materialId: m.id })),
+          skipDuplicates: true,
+        }),
+      ]);
+    }
 
     // Status change or password change kills live sessions immediately.
     if (body.password || (body.status && body.status !== "ACTIVE")) {

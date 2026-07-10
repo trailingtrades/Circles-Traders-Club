@@ -74,10 +74,22 @@ export async function POST(req: NextRequest) {
         subscriptionEnd: end,
         feeTotal: body.feeTotal,
         feePaid: body.feePaid,
+        materialAccess: body.materialAccess,
         notes: body.notes,
       },
       include: { course: { select: { name: true } } },
     });
+
+    if (body.materialAccess === "CUSTOM" && body.materialIds?.length) {
+      const validIds = await prisma.material.findMany({
+        where: { id: { in: body.materialIds } },
+        select: { id: true },
+      });
+      await prisma.studentMaterialAccess.createMany({
+        data: validIds.map((m) => ({ studentId: student.id, materialId: m.id })),
+        skipDuplicates: true,
+      });
+    }
 
     await logActivity({
       type: "STUDENT_CREATED",

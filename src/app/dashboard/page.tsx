@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { accessState, daysRemaining } from "@/lib/subscription";
+import { materialsForStudent } from "@/lib/student-materials";
 import Logo from "@/components/Logo";
 import ThemeToggle from "@/components/ThemeToggle";
 import LogoutButton from "@/components/LogoutButton";
@@ -28,12 +29,7 @@ export default async function DashboardPage() {
     ? await prisma.course.findUnique({ where: { id: student.courseId } })
     : await prisma.course.findFirst({ where: { isActive: true }, orderBy: { createdAt: "asc" } });
 
-  const materials = course
-    ? await prisma.material.findMany({
-        where: { courseId: course.id, isActive: true },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      })
-    : [];
+  const materials = await materialsForStudent(student);
 
   const days = daysRemaining(student);
   const expiringSoon = days <= 7;

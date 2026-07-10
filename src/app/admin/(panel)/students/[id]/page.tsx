@@ -11,18 +11,24 @@ export const dynamic = "force-dynamic";
 
 export default async function EditStudentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [student, courses] = await Promise.all([
+  const [student, courses, materials] = await Promise.all([
     prisma.student.findUnique({
       where: { id },
       include: {
         sessions: { orderBy: { lastActiveAt: "desc" } },
         activityLogs: { orderBy: { createdAt: "desc" }, take: 15 },
+        materialGrants: { select: { materialId: true } },
       },
     }),
     prisma.course.findMany({
       where: { isActive: true },
       select: { id: true, name: true },
       orderBy: { createdAt: "asc" },
+    }),
+    prisma.material.findMany({
+      where: { isActive: true },
+      include: { course: { select: { name: true } } },
+      orderBy: [{ courseId: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
     }),
   ]);
   if (!student) notFound();
@@ -54,6 +60,13 @@ export default async function EditStudentPage({ params }: { params: Promise<{ id
             mode="edit"
             studentId={student.id}
             courses={courses}
+            materials={materials.map((m) => ({
+              id: m.id,
+              title: m.title,
+              type: m.type,
+              courseName: m.course.name,
+            }))}
+            initialMaterialIds={student.materialGrants.map((g) => g.materialId)}
             initial={{
               fullName: student.fullName,
               email: student.email,
@@ -63,6 +76,7 @@ export default async function EditStudentPage({ params }: { params: Promise<{ id
               subscriptionEnd: formatDateOnly(student.subscriptionEnd),
               feeTotal: student.feeTotal,
               feePaid: student.feePaid,
+              materialAccess: student.materialAccess,
               notes: student.notes ?? "",
             }}
           />

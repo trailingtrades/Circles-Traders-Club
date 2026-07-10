@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStudentSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { accessState } from "@/lib/subscription";
+import { accessibleMaterial } from "@/lib/student-materials";
 import { loadCourseHtml } from "@/lib/course-content";
 import { logActivity } from "@/lib/activity";
 
@@ -23,23 +23,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
-  const material = await prisma.material.findUnique({ where: { id }, include: { course: true } });
-  if (!material || !material.isActive || material.type !== "HTML" || !material.contentPath) {
-    return new NextResponse("Not found", { status: 404 });
-  }
-
-  // Authorisation: the material must belong to the student's course
-  // (or the default course when the student has none assigned).
-  const studentCourseId =
-    student.courseId ??
-    (
-      await prisma.course.findFirst({
-        where: { isActive: true },
-        orderBy: { createdAt: "asc" },
-        select: { id: true },
-      })
-    )?.id;
-  if (material.courseId !== studentCourseId || !material.course.isActive) {
+  // Per-student authorisation (course membership or explicit custom grant).
+  const material = await accessibleMaterial(student, id);
+  if (!material || material.type !== "HTML" || !material.contentPath) {
     return new NextResponse("Not found", { status: 404 });
   }
 
