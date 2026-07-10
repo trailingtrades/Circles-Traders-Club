@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
     const rows: (string | null)[][] = [
       [
         "fullName", "email", "mobile", "course", "status", "subscriptionStart",
-        "subscriptionEnd", "accessState", "lastLoginAt", "notes", "createdAt",
+        "subscriptionEnd", "accessState", "feeTotal", "feePaid", "feeDue",
+        "lastLoginAt", "notes", "createdAt",
       ],
       ...students.map((s) => [
         s.fullName,
@@ -36,6 +37,9 @@ export async function GET(req: NextRequest) {
         formatDateOnly(s.subscriptionStart),
         formatDateOnly(s.subscriptionEnd),
         s.status !== "ACTIVE" ? s.status.toLowerCase() : s.subscriptionEnd >= today ? "active" : "expired",
+        String(s.feeTotal),
+        String(s.feePaid),
+        String(Math.max(0, s.feeTotal - s.feePaid)),
         s.lastLoginAt ? s.lastLoginAt.toISOString() : "",
         s.notes ?? "",
         s.createdAt.toISOString(),

@@ -11,6 +11,8 @@ export type StudentFormValues = {
   courseId?: string;
   subscriptionStart: string; // YYYY-MM-DD
   subscriptionEnd: string; // YYYY-MM-DD
+  feeTotal: number;
+  feePaid: number;
   notes?: string;
 };
 
@@ -36,6 +38,8 @@ export default function StudentForm({
     subscriptionEnd:
       initial?.subscriptionEnd ??
       new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+    feeTotal: initial?.feeTotal ?? 0,
+    feePaid: initial?.feePaid ?? 0,
     notes: initial?.notes ?? "",
   });
   const [sendWelcome, setSendWelcome] = useState(true);
@@ -140,6 +144,44 @@ export default function StudentForm({
             <label className="label">Sub. end *</label>
             <input className="input" type="date" required value={values.subscriptionEnd} onChange={(e) => set("subscriptionEnd", e.target.value)} />
           </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label className="label">Course fee (₹)</label>
+          <input
+            className="input"
+            type="number"
+            min={0}
+            step={1}
+            value={values.feeTotal}
+            onChange={(e) => set("feeTotal", Math.max(0, parseInt(e.target.value, 10) || 0))}
+          />
+        </div>
+        <div>
+          <label className="label">Paid so far (₹)</label>
+          <input
+            className="input"
+            type="number"
+            min={0}
+            step={1}
+            value={values.feePaid}
+            onChange={(e) => set("feePaid", Math.max(0, parseInt(e.target.value, 10) || 0))}
+          />
+        </div>
+        <div>
+          <label className="label">Balance due</label>
+          <p
+            className={`rounded-lg px-3 py-2 text-sm font-bold ${
+              values.feeTotal - values.feePaid > 0
+                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+            }`}
+          >
+            ₹{Math.max(0, values.feeTotal - values.feePaid).toLocaleString("en-IN")}
+            {values.feeTotal - values.feePaid <= 0 && " · settled"}
+          </p>
         </div>
       </div>
 

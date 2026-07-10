@@ -11,6 +11,8 @@ type StudentRow = {
   status: "ACTIVE" | "DISABLED" | "REVOKED";
   subscriptionStart: string;
   subscriptionEnd: string;
+  feeTotal: number;
+  feePaid: number;
   lastLoginAt: string | null;
   course: { name: string } | null;
 };
@@ -23,6 +25,7 @@ const STATUS_TABS = [
   { key: "expired", label: "Expired" },
   { key: "disabled", label: "Disabled" },
   { key: "revoked", label: "Revoked" },
+  { key: "due", label: "₹ Payment due" },
 ] as const;
 
 function fmtDate(iso: string) {
@@ -219,15 +222,16 @@ export default function StudentsTable({ initialStatus = "all" }: { initialStatus
               <th className="p-3">Course</th>
               <th className="p-3">Status</th>
               <th className="p-3">Subscription</th>
+              <th className="p-3">Payment</th>
               <th className="p-3">Last login</th>
               <th className="p-3"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="p-6 text-center text-ink-400">Loading…</td></tr>
+              <tr><td colSpan={9} className="p-6 text-center text-ink-400">Loading…</td></tr>
             ) : !data || data.students.length === 0 ? (
-              <tr><td colSpan={8} className="p-6 text-center text-ink-400">No students found.</td></tr>
+              <tr><td colSpan={9} className="p-6 text-center text-ink-400">No students found.</td></tr>
             ) : (
               data.students.map((s) => (
                 <tr key={s.id} className="border-b border-ink-100 last:border-0 hover:bg-ink-50 dark:border-ink-800 dark:hover:bg-ink-800/50">
@@ -245,6 +249,21 @@ export default function StudentsTable({ initialStatus = "all" }: { initialStatus
                   <td className="p-3">{accessBadge(s)}</td>
                   <td className="p-3 whitespace-nowrap">
                     {fmtDate(s.subscriptionStart)} → <b>{fmtDate(s.subscriptionEnd)}</b>
+                  </td>
+                  <td className="p-3 whitespace-nowrap">
+                    {s.feeTotal > 0 ? (
+                      s.feeTotal - s.feePaid > 0 ? (
+                        <span className="badge bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">
+                          ₹{(s.feeTotal - s.feePaid).toLocaleString("en-IN")} due
+                        </span>
+                      ) : (
+                        <span className="badge bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                          ₹{s.feePaid.toLocaleString("en-IN")} paid
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-xs text-ink-400">—</span>
+                    )}
                   </td>
                   <td className="p-3 whitespace-nowrap text-xs">
                     {s.lastLoginAt

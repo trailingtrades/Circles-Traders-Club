@@ -28,8 +28,21 @@ export default async function DashboardPage() {
     ? await prisma.course.findUnique({ where: { id: student.courseId } })
     : await prisma.course.findFirst({ where: { isActive: true }, orderBy: { createdAt: "asc" } });
 
+  const materials = course
+    ? await prisma.material.findMany({
+        where: { courseId: course.id, isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      })
+    : [];
+
   const days = daysRemaining(student);
   const expiringSoon = days <= 7;
+  const typeMeta: Record<string, { icon: string; label: string }> = {
+    HTML: { icon: "📖", label: "Study material" },
+    VIDEO: { icon: "🎥", label: "Recorded lecture" },
+    SHEET: { icon: "📊", label: "Live sheet" },
+    LINK: { icon: "🔗", label: "Resource" },
+  };
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-6">
@@ -81,18 +94,44 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="card mt-6 flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-ink-900 dark:text-white">
-            {course?.name ?? "Learning material"}
-          </h2>
-          <p className="text-sm text-ink-500 dark:text-ink-400">
-            {course?.description ?? "Your enrolled study material."}
-          </p>
-        </div>
-        <Link href="/course" className="btn-primary shrink-0">
-          📖 Open Learning Material
-        </Link>
+      <div className="card mt-6 p-6">
+        <h2 className="text-lg font-bold text-ink-900 dark:text-white">
+          {course?.name ?? "Learning material"}
+        </h2>
+        <p className="text-sm text-ink-500 dark:text-ink-400">
+          {course?.description ?? "Your enrolled study material."}
+        </p>
+
+        {materials.length === 0 ? (
+          <div className="mt-5">
+            <Link href="/course" className="btn-primary">📖 Open Learning Material</Link>
+          </div>
+        ) : (
+          <ul className="mt-5 divide-y divide-ink-100 dark:divide-ink-800">
+            {materials.map((m) => {
+              const meta = typeMeta[m.type] ?? typeMeta.LINK;
+              return (
+                <li key={m.id}>
+                  <Link
+                    href={`/materials/${m.id}`}
+                    className="group flex items-center gap-4 py-3 transition hover:bg-ink-50 dark:hover:bg-ink-800/50"
+                  >
+                    <span className="text-2xl">{meta.icon}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold text-ink-900 group-hover:text-brand-600 dark:text-white dark:group-hover:text-brand-400">
+                        {m.title}
+                      </span>
+                      <span className="block truncate text-xs text-ink-500 dark:text-ink-400">
+                        {m.description || meta.label}
+                      </span>
+                    </span>
+                    <span className="btn-secondary shrink-0 !px-3 !py-1 text-xs">Open →</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       <p className="mt-8 text-center text-xs text-ink-400">

@@ -44,6 +44,32 @@ async function main() {
     update: {},
   });
   console.log(`Course ready: ${course.name}`);
+
+  // Default materials — created once; admins manage the rest from the panel.
+  const existingMaterials = await prisma.material.count({ where: { courseId: course.id } });
+  if (existingMaterials === 0) {
+    await prisma.material.createMany({
+      data: [
+        {
+          courseId: course.id,
+          title: "Five Circles Options — Selling Playbook",
+          description: "The complete strategy playbook (English + हिंदी)",
+          type: "HTML",
+          contentPath: "options-selling-playbook.html",
+          sortOrder: 0,
+        },
+        {
+          courseId: course.id,
+          title: "5Circles Advisory Tracker",
+          description: "Live advisory performance tracker (view-only Google Sheet)",
+          type: "SHEET",
+          url: "https://docs.google.com/spreadsheets/d/1PTvVZxUdbaisTYlpWpb9dReB2q4JN6ZIvQDYBw1kKtQ/edit?usp=sharing",
+          sortOrder: 1,
+        },
+      ],
+    });
+    console.log("Materials ready: playbook + advisory tracker sheet");
+  }
 }
 
 main()

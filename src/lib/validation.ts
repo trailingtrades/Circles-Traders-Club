@@ -27,6 +27,8 @@ export const resetPasswordSchema = z.object({
   password: passwordSchema,
 });
 
+const feeAmount = z.coerce.number().int().min(0).max(100_000_000);
+
 export const studentCreateSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
   email: emailSchema,
@@ -40,6 +42,8 @@ export const studentCreateSchema = z.object({
   courseId: z.string().trim().min(1).optional().or(z.literal("").transform(() => undefined)),
   subscriptionStart: dateString,
   subscriptionEnd: dateString,
+  feeTotal: feeAmount.optional().default(0),
+  feePaid: feeAmount.optional().default(0),
   notes: z.string().max(2000).optional().or(z.literal("").transform(() => undefined)),
   sendWelcomeEmail: z.boolean().optional().default(true),
 });
@@ -58,8 +62,45 @@ export const studentUpdateSchema = z.object({
   courseId: z.string().trim().nullable().optional().or(z.literal("").transform(() => null)),
   subscriptionStart: dateString.optional(),
   subscriptionEnd: dateString.optional(),
+  feeTotal: feeAmount.optional(),
+  feePaid: feeAmount.optional(),
   notes: z.string().max(2000).nullable().optional(),
   status: z.enum(["ACTIVE", "DISABLED", "REVOKED"]).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Materials
+// ---------------------------------------------------------------------------
+const httpsUrl = z
+  .string()
+  .trim()
+  .url()
+  .max(2000)
+  .refine((u) => u.startsWith("https://") || u.startsWith("http://"), "Must be an http(s) URL");
+
+export const materialCreateSchema = z
+  .object({
+    courseId: z.string().trim().min(1),
+    title: z.string().trim().min(2).max(200),
+    description: z.string().max(1000).optional().or(z.literal("").transform(() => undefined)),
+    type: z.enum(["HTML", "VIDEO", "SHEET", "LINK"]),
+    contentPath: z.string().trim().max(300).optional().or(z.literal("").transform(() => undefined)),
+    url: httpsUrl.optional().or(z.literal("").transform(() => undefined)),
+    sortOrder: z.coerce.number().int().min(0).max(9999).optional().default(0),
+    isActive: z.boolean().optional().default(true),
+  })
+  .refine((m) => (m.type === "HTML" ? !!m.contentPath : !!m.url), {
+    message: "HTML materials need a contentPath; other types need a URL",
+  });
+
+export const materialUpdateSchema = z.object({
+  title: z.string().trim().min(2).max(200).optional(),
+  description: z.string().max(1000).nullable().optional(),
+  type: z.enum(["HTML", "VIDEO", "SHEET", "LINK"]).optional(),
+  contentPath: z.string().trim().max(300).nullable().optional(),
+  url: httpsUrl.nullable().optional(),
+  sortOrder: z.coerce.number().int().min(0).max(9999).optional(),
+  isActive: z.boolean().optional(),
 });
 
 export const bulkActionSchema = z.object({
@@ -71,7 +112,7 @@ export const bulkActionSchema = z.object({
 
 export const listQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
-  status: z.enum(["all", "active", "expired", "disabled", "revoked"]).optional().default("all"),
+  status: z.enum(["all", "active", "expired", "disabled", "revoked", "due"]).optional().default("all"),
   page: z.coerce.number().int().min(1).optional().default(1),
   perPage: z.coerce.number().int().min(1).max(100).optional().default(20),
 });

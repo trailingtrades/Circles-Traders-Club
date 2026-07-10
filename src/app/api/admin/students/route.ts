@@ -72,6 +72,8 @@ export async function POST(req: NextRequest) {
         courseId,
         subscriptionStart: start,
         subscriptionEnd: end,
+        feeTotal: body.feeTotal,
+        feePaid: body.feePaid,
         notes: body.notes,
       },
       include: { course: { select: { name: true } } },

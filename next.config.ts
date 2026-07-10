@@ -19,7 +19,8 @@ const securityHeaders = [
       "img-src 'self' data:",
       "font-src 'self' data:",
       "connect-src 'self'",
-      "frame-src 'self'",
+      // Embedded materials: Google Sheets + recorded lectures (YouTube/Vimeo)
+      "frame-src 'self' https://docs.google.com https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com",
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",

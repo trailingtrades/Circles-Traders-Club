@@ -46,6 +46,9 @@ model Student {
   status            StudentStatus @default(ACTIVE)
   subscriptionStart DateTime
   subscriptionEnd   DateTime
+  // Fee tracking (whole rupees). Due = feeTotal - feePaid.
+  feeTotal          Int           @default(0)
+  feePaid           Int           @default(0)
   notes             String?
   courseId          String?
   course            Course?       @relation(fields: [courseId], references: [id], onDelete: SetNull)
@@ -77,9 +80,42 @@ model Course {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  students Student[]
+  students  Student[]
+  materials Material[]
 
   @@map("courses")
+}
+
+// ---------------------------------------------------------------------------
+// Materials — the individual learning items inside a course.
+//   HTML  : a file in the protected /content dir, served via authenticated route
+//   VIDEO : an embedded recorded lecture (YouTube/Vimeo URL)
+//   SHEET : a Google Sheet embedded read-only
+//   LINK  : any external resource, opened in a new tab
+// ---------------------------------------------------------------------------
+enum MaterialType {
+  HTML
+  VIDEO
+  SHEET
+  LINK
+}
+
+model Material {
+  id          String       @id @default(cuid())
+  courseId    String
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  type        MaterialType
+  contentPath String? // HTML: path relative to /content
+  url         String? // VIDEO / SHEET / LINK: external URL
+  sortOrder   Int          @default(0)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([courseId, sortOrder])
+  @@map("materials")
 }
 
 // ---------------------------------------------------------------------------
@@ -133,6 +169,9 @@ enum ActivityType {
   FORCED_LOGOUT
   BULK_OPERATION
   REMINDER_EMAIL_SENT
+  MATERIAL_CREATED
+  MATERIAL_UPDATED
+  MATERIAL_DELETED
 }
 
 model ActivityLog {
