@@ -93,6 +93,30 @@ export const materialCreateSchema = z
     message: "HTML materials need a contentPath; other types need a URL",
   });
 
+// ---------------------------------------------------------------------------
+// Courses
+// ---------------------------------------------------------------------------
+export const courseCreateSchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  description: z.string().max(1000).optional().or(z.literal("").transform(() => undefined)),
+});
+
+export const courseUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(200).optional(),
+  description: z.string().max(1000).nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "course"
+  );
+}
+
 export const materialUpdateSchema = z.object({
   title: z.string().trim().min(2).max(200).optional(),
   description: z.string().max(1000).nullable().optional(),

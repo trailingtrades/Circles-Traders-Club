@@ -75,7 +75,8 @@ model Course {
   name        String
   slug        String   @unique
   description String?
-  contentPath String
+  // Legacy single-file pointer; new courses carry their content as Materials.
+  contentPath String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -172,6 +173,9 @@ enum ActivityType {
   MATERIAL_CREATED
   MATERIAL_UPDATED
   MATERIAL_DELETED
+  COURSE_CREATED
+  COURSE_UPDATED
+  COURSE_DELETED
 }
 
 model ActivityLog {

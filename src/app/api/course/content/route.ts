@@ -33,9 +33,22 @@ export async function GET() {
     return new NextResponse("No course assigned. Please contact the institute.", { status: 404 });
   }
 
+  // Prefer the legacy course-level file; fall back to the first HTML material.
+  let contentPath = course.contentPath;
+  if (!contentPath) {
+    const firstHtml = await prisma.material.findFirst({
+      where: { courseId: course.id, type: "HTML", isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    });
+    contentPath = firstHtml?.contentPath ?? null;
+  }
+  if (!contentPath) {
+    return new NextResponse("This course has no study material yet.", { status: 404 });
+  }
+
   let html: string;
   try {
-    html = await loadCourseHtml(course.contentPath, student);
+    html = await loadCourseHtml(contentPath, student);
   } catch (err) {
     console.error("Failed to load course content:", err);
     return new NextResponse("Course content unavailable", { status: 500 });
