@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Five Circles Options — Selling Playbook</title>
+<style>
+  :root{
+    --bg:#0e1117; --card:#161b26; --card2:#1c2333; --border:#2a3245;
+    --txt:#d6dae3; --dim:#8b93a7; --hdr:#ffffff;
+    --green:#26a69a; --red:#ef5350; --amber:#f0b90b; --blue:#4f8cff; --purple:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font:14px/1.55 -apple-system,Segoe UI,Roboto,'Noto Sans Devanagari',sans-serif;padding:24px}
+  h1{color:var(--hdr);font-size:24px;margin-bottom:2px}
+  h1 .fc{color:var(--amber)}
+  .sub{color:var(--dim);margin-bottom:20px;font-size:13px}
+  .picker{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:22px}
+  .picker h2{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+  .row{display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+  .grp{display:flex;align-items:center;gap:8px}
+  .grp span{color:var(--dim);font-size:12px}
+  .btn{background:var(--card2);border:1px solid var(--border);color:var(--txt);padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px}
+  .btn:hover{border-color:var(--blue)}
+  .btn.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+  .btn.on.up{background:var(--green);border-color:var(--green)}
+  .btn.on.dn{background:var(--red);border-color:var(--red)}
+  .btn.on.hi{background:var(--amber);border-color:var(--amber);color:#111}
+  .verdict{margin-top:12px;font-size:13px;color:var(--dim)}
+  .verdict b{color:var(--hdr)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;transition:opacity .25s,border-color .25s}
+  .card.dim{opacity:.22}
+  .card.hit{border-color:var(--amber)}
+  .card h3{color:var(--hdr);font-size:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tag{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:.05em}
+  .t-neu{background:#2b3a55;color:#9fc0ff}.t-bul{background:#1d3d33;color:#6fd3c2}
+  .t-ber{background:#452429;color:#ff9e9a}.t-tim{background:#3d3050;color:#cdb6ff}
+  .risk{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
+  .r-def{background:#1d3d33;color:#6fd3c2}.r-und{background:#452429;color:#ff9e9a}
+  .rate{margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .stars{color:var(--amber);font-size:16px;letter-spacing:2px}
+  .best{font-size:10px;padding:2px 8px;border-radius:10px;background:#3d3413;color:var(--amber);font-weight:700}
+  .theta{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;background:#233a4d;color:#7fd0ff}
+  .why{font-size:12px;color:var(--dim);margin-top:2px}
+  .pay{margin-top:10px;background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:6px;text-align:center}
+  .pay svg{max-width:100%}
+  .paycap{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+  .sec{margin-top:10px}
+  .sec b{color:var(--hdr);font-size:12px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px}
+  .sec.deploy b{color:var(--blue)} .sec.tech b{color:var(--amber)} .sec.dte b{color:var(--purple)}
+  .sec.sl b{color:var(--red)} .sec.tgt b{color:var(--green)} .sec.adj b{color:#e0a8ff}
+  .sec.ex b{color:#7fd0ff} .sec.hin b{color:#ffb86b}
+  .sec div,.sec li{color:var(--txt);font-size:13px}
+  .sec ul{padding-left:18px}
+  .ex .exbox{background:var(--card2);border-radius:8px;padding:8px 10px}
+  .hin .hibox{background:#1f1a12;border:1px solid #3a2f1a;border-radius:8px;padding:8px 10px;font-size:13.5px;line-height:1.7}
+  .foot{margin-top:26px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .foot h2{font-size:14px;color:var(--hdr);margin-bottom:8px}
+  .foot li{font-size:13px;color:var(--txt);margin-left:18px;margin-bottom:4px}
+  .foot em{color:var(--dim)}
+</style>
+</head>
+<body>
+<h1><span class="fc">Five Circles Options</span> — Selling Playbook</h1>
+<div class="sub">हर strategy — कब लगाएं (deploy conditions), technical checklist, DTE, stop-loss / target / adjustment — English + हिंदी में, हर card पर NIFTY उदाहरण, payoff diagram और ⭐ rating के साथ. Premiums in examples are illustrative (NIFTY ≈ 25,000, lot = 75). Companion to <i>options-selling-strategies.md</i>.</div>
+
+<div class="picker">
+  <h2>What is the market doing right now? / अभी market क्या कर रहा है?</h2>
+  <div class="row">
+    <div class="grp"><span>TREND (रुझान):</span>
+      <button class="btn tr up" data-v="up">Uptrend</button>
+      <button class="btn tr" data-v="range">Range</button>
+      <button class="btn tr dn" data-v="down">Downtrend</button>
+    </div>
+    <div class="grp"><span>IV RANK:</span>
+      <button class="btn iv hi" data-v="high">High (&gt;50)</button>
+      <button class="btn iv" data-v="low">Low (&lt;30)</button>
+    </div>
+    <div class="grp"><span>EVENT ≤ 3 DAYS (इवेंट):</span>
+      <button class="btn ev" data-v="yes">Yes</button>
+      <button class="btn ev on" data-v="no">No</button>
+    </div>
+  </div>
+  <div class="verdict" id="verdict">Select trend and IV to filter the playbook. / Trend और IV चुनें — मिलती-जुलती strategies highlight हो जाएँगी.</div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="foot">
+  <h2>Universal rules / सबसे ज़रूरी नियम (P&amp;L strategy से नहीं, इन्हीं से बनता है)</h2>
+  <ul>
+    <li><b>Size:</b> 1–2% capital risk per position; total heat ~10–15% max. / हर trade में capital का सिर्फ 1–2% risk.</li>
+    <li><b>50% rule:</b> credit का 50% profit मिलते ही close करें — आख़िरी 20% के लिए gamma risk मत उठाइए.</li>
+    <li><b>21-DTE rule:</b> positional trades 21 DTE पर exit/roll — इसके बाद gamma zone शुरू होता है.</li>
+    <li><b>2× stop:</b> undefined-risk trades में loss = 1–2× credit होते ही बाहर. Multiple entry से पहले तय करें, बाद में नहीं.</li>
+    <li><b>Delta trigger:</b> short strike 30–35 delta छू ले = defend/exit alarm. उम्मीद कोई plan नहीं है.</li>
+    <li><b>Never average</b> into a breached short strike. / टूटे हुए strike पर कभी position मत बढ़ाइए.</li>
+    <li><b>India:</b> 4-leg structures को brokerage+STT hurdle पार करना ज़रूरी है; NIFTY/BANKNIFTY के बाहर liquidity check करें.</li>
+    <li><em>Evidence: options-selling-research.md — VRP papers, BXM/PUT studies, Bank Nifty cost study, SEBI FY25 data.</em></li>
+  </ul>
+</div>
+
+<script>
+// ---------- payoff drawer: pts = [[x0-100, y-1..1],...] ; splits green/red at zero ----------
+function payoffSVG(pts){
+  const W=300,H=110,X=x=>15+x*(W-30)/100,Y=y=>55-y*40;
+  let segs=[],cur=[],sign=s=>s>0?1:(s<0?-1:0);
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i];
+    if(cur.length){
+      const q=cur[cur.length-1];
+      if(sign(q[1])*sign(p[1])<0){
+        const t=q[1]/(q[1]-p[1]),xc=q[0]+t*(p[0]-q[0]);
+        cur.push([xc,0]);segs.push(cur);cur=[[xc,0]];
+      }
+    }
+    cur.push(p);
+  }
+  if(cur.length>1)segs.push(cur);
+  let out=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  out+=`<line x1="10" y1="${Y(0)}" x2="${W-10}" y2="${Y(0)}" stroke="#3a4257" stroke-dasharray="4 3"/>`;
+  out+=`<text x="${W-12}" y="${Y(0)-4}" fill="#5c6478" font-size="9" text-anchor="end">price →</text>`;
+  segs.forEach(sg=>{
+    const mx=Math.max(...sg.map(p=>p[1])),mn=Math.min(...sg.map(p=>p[1]));
+    const col=(mx>0)?"#26a69a":(mn<0?"#ef5350":"#8b93a7");
+    const d=sg.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join(" ");
+    out+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  });
+  out+=`</svg>`;return out;
+}
+function starStr(n){let s="★".repeat(Math.floor(n));if(n%1)s+="½";return s;}
+
+const S=[
+{n:"Short Strangle",g:"neu",r:"und",tr:["range"],iv:["high"],ev:false,st:5,best:"#1 OVERALL",thb:"THETA: HIGH",
+ why:"The most powerful pure premium harvester — highest evidence, ~70% POP, double theta. King of the playbook when conditions match.",
+ pay:[[0,-0.9],[25,0.35],[75,0.35],[100,-0.9]],
+ dep:"Range-bound market + rich premium. The workhorse: undefined risk both sides, paid on both sides.",
+ tech:["ADX(14) < 20–25 and flat/falling","Price mid-Bollinger, 20 & 50 MA flat and interwoven","IV Rank > 50 (ideally > 70)","Strikes beyond support/resistance AND beyond 1.5× expected move (ATM straddle price)","RSI 40–60 (no momentum bias)","No heavy one-sided PCR/OI reading"],
+ dte:"30–45 DTE; exit/roll by 21 DTE",ent:"Sell 16–20Δ call + 16–20Δ put",
+ sl:"Loss = 1.5–2× credit (hard, pre-decided) OR either short strike hits 30–35Δ OR daily close beyond a short strike — whichever first.",
+ tgt:"Buy back at 50% of credit. If 50% arrives in week one, take it and redeploy.",
+ adj:["Roll the UNTESTED side closer (more credit, recentre)","Roll tested strike out in time for a credit","Breach accelerating: convert to iron fly or exit — never add lots"],
+ ex:"NIFTY @ 25,000 (35 DTE): sell 25,600 CE ₹85 + sell 24,400 PE ₹95 → credit 180 pts ≈ ₹13,500/lot. Target: buy back @ 90 pts (₹6,750 profit). Stop: combined loss 270–360 pts, or any strike touching 30Δ.",
+ hi:"<b>क्या है:</b> OTM Call और OTM Put दोनों बेचना. Market range में रहा तो दोनों premium theta से रोज़ घिसते हैं और दोनों आपकी जेब में.<br><b>कब लगाएं:</b> जब ADX 20 से नीचे हो (कोई trend नहीं), IV Rank 50+ हो (premium महँगा), और strikes मज़बूत support/resistance के बाहर हों.<br><b>SL:</b> credit का 1.5–2 गुना loss या कोई strike 30 delta छू ले — तुरंत बाहर.<br><b>Target:</b> credit का 50% मिलते ही बंद करें.<br><b>Adjustment:</b> जिस side price नहीं गया, उसे पास लाकर और premium लें; टूटती side को अगली expiry में roll करें. Position कभी बड़ी मत करिए."},
+{n:"Iron Condor",g:"neu",r:"def",tr:["range"],iv:["high"],ev:true,st:4,best:"",thb:"THETA: MED",
+ why:"The strangle with a seatbelt. Slightly less powerful (POP ~60%, smaller credit, 4-leg costs) but capped risk = sleep + event-safe.",
+ pay:[[0,-0.5],[15,-0.5],[30,0.35],[70,0.35],[85,-0.5],[100,-0.5]],
+ dep:"Same regime as the strangle but with wings: smaller account, margin limits, gap fear, or IV so extreme naked is reckless. The defined-risk way to hold through events.",
+ tech:["Same checklist as short strangle","Credit ≥ 1/3 of wing width (else skip — cost hurdle)","Wings sized to margin comfort (NIFTY: 150–300 pts beyond shorts)"],
+ dte:"30–45 DTE; exit by 21 DTE",ent:"Sell 16–20Δ strangle + buy 5–10Δ wings",
+ sl:"Loss = 1–2× credit OR short strike tested. Max loss is capped but don't ride to it — the wing is insurance, not a plan.",
+ tgt:"50% of credit.",
+ adj:["Roll untested spread closer","Roll whole condor out a cycle if thesis intact","Close tested spread at 2× its credit, let the other decay"],
+ ex:"NIFTY @ 25,000: sell 25,600 CE ₹85 + 24,400 PE ₹95, buy 25,800 CE ₹45 + 24,200 PE ₹50 → net credit 85 pts ≈ ₹6,375/lot; max loss 115 pts (wings 200). Credit 85 ≥ 200/3 ✓. Target 42 pts; stop on short-strike test.",
+ hi:"<b>क्या है:</b> Strangle + दोनों तरफ़ सस्ते OTM options ख़रीदकर 'wings' — यानी नुक़सान की छत तय.<br><b>कब लगाएं:</b> Strangle जैसी ही condition, पर जब account छोटा हो, margin कम हो, या event/gap का डर हो.<br><b>ध्यान:</b> credit कम-से-कम wing width का 1/3 हो, वरना 4 legs की brokerage+STT खा जाएगी.<br><b>SL/Target:</b> strangle जैसा — 50% पर profit book, strike test पर defense.<br><b>Adjustment:</b> untested spread पास लाएँ, या पूरा condor अगली expiry में roll करें."},
+{n:"Short Straddle",g:"neu",r:"und",tr:["range"],iv:["high"],ev:false,st:3.5,best:"",thb:"THETA: VERY HIGH",
+ why:"Biggest theta engine per lot, but the narrowest profit zone and brutal gamma — power only with a pin expectation and fast hands.",
+ pay:[[0,-1],[50,0.55],[100,-1]],
+ dep:"Maximum premium, maximum conviction: expect price to PIN. Post-event IV crush or expiry pinning at a magnet strike.",
+ tech:["Heavy OI wall / max-pain at the ATM strike","ADX < 20; Bollinger squeeze AFTER a vol event (not before)","IV Rank > 70","Intraday: flat VWAP, balanced day"],
+ dte:"0–7 DTE (weekly game) or same-day",ent:"Sell ATM call + ATM put",
+ sl:"Loss = 1–1.5× credit OR price beyond a breakeven. Tighter than a strangle — gamma is brutal.",
+ tgt:"25–50% of credit, usually same/next day. Never hold for the last 20%.",
+ adj:["Delta-hedge with futures when position delta > ±0.15/lot","Convert to iron fly (buy wings) if holding overnight","Range expansion = exit, not adjust"],
+ ex:"NIFTY @ 25,000 (weekly, 4 DTE): sell 25,000 CE ₹160 + 25,000 PE ₹150 → credit 310 pts ≈ ₹23,250/lot. Breakevens 24,690–25,310. Target 78–155 pts fast; stop if NIFTY closes beyond a breakeven.",
+ hi:"<b>क्या है:</b> ATM Call + ATM Put दोनों बेचना — सबसे मोटा premium, पर profit zone सबसे पतला.<br><b>कब लगाएं:</b> सिर्फ़ तब जब पक्का लगे price एक जगह चिपकेगा — जैसे बड़े event के बाद IV crush, या expiry pin (जहाँ सबसे ज़्यादा OI हो).<br><b>SL:</b> credit का 1–1.5 गुना, या breakeven पार — तुरंत बाहर. यहाँ देर = बड़ा नुक़सान.<br><b>Target:</b> 25–50% उसी दिन/अगले दिन.<br><b>Adjustment:</b> delta बढ़े तो futures से hedge करें; रात रखना हो तो wings ख़रीदकर iron fly बना लें."},
+{n:"Iron Butterfly",g:"neu",r:"def",tr:["range"],iv:["high"],ev:true,st:3.5,best:"",thb:"THETA: HIGH",
+ why:"Defined-risk straddle with extra vega — loves IV crush. Strong, but needs the pin to be roughly right.",
+ pay:[[0,-0.5],[20,-0.5],[50,0.6],[80,-0.5],[100,-0.5]],
+ dep:"The defined-risk straddle: pin expectation + wings. Higher credit & vega than a condor — benefits most from IV crush.",
+ tech:["Same pin logic: OI magnet strike, low ADX","IV Rank > 60 with a reason to crush (post-event)","Breakevens wider than the expected move"],
+ dte:"7–30 DTE",ent:"Sell ATM straddle + buy wings at/behind breakeven distance",
+ sl:"Price beyond a breakeven on a closing basis, or loss = credit.",
+ tgt:"25–35% of credit (flies rarely reach 50% early).",
+ adj:["Roll the centre to follow a small drift","Otherwise treat as straddle: exit on range expansion"],
+ ex:"NIFTY @ 25,000: sell 25,000 CE ₹160 + 25,000 PE ₹150, buy 25,400 CE ₹55 + 24,600 PE ₹50 → net credit 205 pts ≈ ₹15,375/lot; max loss 195 pts. Target ~60 pts; stop beyond 24,795/25,205 close.",
+ hi:"<b>क्या है:</b> Straddle + दोनों तरफ़ wings — यानी pin का सौदा, पर नुक़सान capped.<br><b>कब लगाएं:</b> जब price किसी strike पर चिपकने की उम्मीद हो और IV crush आने वाला हो (event के बाद). Condor से ज़्यादा credit, ज़्यादा vega.<br><b>SL:</b> closing basis पर breakeven पार, या loss = credit.<br><b>Target:</b> 25–35% — flies में 50% का इंतज़ार अक्सर महँगा पड़ता है.<br><b>Adjustment:</b> हल्का drift हो तो centre roll करें; range खुल जाए तो बाहर."},
+{n:"Calendar / Double Calendar",g:"neu",r:"def",tr:["range"],iv:["low"],ev:true,st:3.5,best:"#1 LOW-IV",thb:"THETA: MED (front leg)",
+ why:"The ONLY selling structure that works in low IV — you own cheap back-month vega while eating expensive front-week theta.",
+ pay:[[0,-0.4],[30,0],[50,0.55],[70,0],[100,-0.4]],
+ dep:"THE low-IV structure and the event structure: sell the expensive front weekly, own the cheaper back month. Double calendar = a tent over a range.",
+ tech:["Front-expiry IV > back-expiry IV (term inversion — event in front week)","Price at/near the chosen strike; range narrowing","Overall IV Rank LOW (back month cheap to own)"],
+ dte:"Short leg 5–10 DTE, long leg 30–45 DTE",ent:"Sell front ATM (or strangle), buy same strikes next cycle",
+ sl:"Price escapes the tent (breakeven edges) OR debit loses 40–50%.",
+ tgt:"20–30% on the debit; exit at front expiry.",
+ adj:["Price drifts: add a second calendar at the new strike (→ double)","Roll the front leg out weekly while the thesis holds (the 'campaign')"],
+ ex:"NIFTY @ 25,000: sell weekly 25,000 CE ₹80, buy monthly 25,000 CE ₹220 → debit 140 pts ≈ ₹10,500/lot. Max profit if NIFTY ≈ 25,000 at weekly expiry. Stop: debit value ₹70–85 or NIFTY beyond ±300.",
+ hi:"<b>क्या है:</b> इस हफ़्ते की महँगी option बेचो, अगले महीने की वही strike ख़रीदो. सामने वाली जल्दी घिसती है, पीछे वाली टिकी रहती है.<br><b>कब लगाएं:</b> जब overall IV कम हो (baaki selling strategies बंद) पर event की वजह से weekly IV monthly से ऊँची हो.<br><b>SL:</b> price tent से बाहर निकल जाए या debit 40–50% घट जाए.<br><b>Target:</b> debit पर 20–30%.<br><b>Adjustment:</b> price खिसके तो नई strike पर दूसरा calendar जोड़कर double बना लें; हर हफ़्ते front leg roll करके 'campaign' चला सकते हैं."},
+{n:"Cash-Secured Put",g:"bul",r:"und",tr:["up","range"],iv:["high"],ev:false,st:4.5,best:"#1 BULLISH",thb:"THETA: MED",
+ why:"The cleanest bullish premium trade: paid to place the limit order you wanted anyway. Decades of PUT-index evidence behind it.",
+ pay:[[0,-1],[40,0.3],[100,0.3]],
+ dep:"Bullish/neutral on something you genuinely want to own; get paid to wait for your price. Entry engine of the Wheel.",
+ tech:["Price above rising 200 DMA (structural uptrend)","Pullback to rising 50 DMA / demand zone — strike AT/below that support","RSI 40–50 curling up (pullback, not breakdown)","IV Rank > 30–50 (post-dip fear premium = best entries)","Delivery volumes rising on up days (accumulation)"],
+ dte:"30–45 DTE",ent:"Sell 20–30Δ put at/below support",
+ sl:"2–3× credit OR structural break: weekly close below the support/200 DMA that justified the strike. If you'd no longer buy it, the trade is dead.",
+ tgt:"50–70% of credit, or accept assignment (that WAS the plan).",
+ adj:["Roll down + out for net credit while thesis holds","Assigned: switch to covered-call mode (Wheel)","Thesis broken: close — don't get assigned into a falling knife"],
+ ex:"NIFTY @ 25,000, support 24,500 (rising 50 DMA): sell monthly 24,500 PE ₹120 ≈ ₹9,000/lot. Target: buy back @ ₹40–60. Stop: weekly close below 24,500 or premium ₹280+. (Stocks: same logic — e.g. RELIANCE at support.)",
+ hi:"<b>क्या है:</b> जिस भाव पर ख़रीदना ही चाहते थे, उस strike का Put बेचो — इंतज़ार के पैसे मिलते हैं.<br><b>कब लगाएं:</b> Uptrend में pullback आए — price 200 DMA के ऊपर, 50 DMA/support पर टिके, RSI 40–50 से मुड़े. Strike उसी support पर या नीचे.<br><b>SL:</b> premium नहीं, structure देखो — जिस support के भरोसे strike बेचा, वो weekly close पर टूटे तो बाहर.<br><b>Target:</b> credit का 50–70%, या assignment स्वीकार करो (plan यही था).<br><b>Adjustment:</b> thesis ठीक है तो roll down+out; टूट गई तो बंद करो."},
+{n:"Bull Put Credit Spread",g:"bul",r:"def",tr:["up"],iv:["high"],ev:true,st:4.5,best:"#1 BULLISH (defined)",thb:"THETA: MED",
+ why:"The defined-risk bullish default — trend + support + rich IV, with the loss capped for indices and events.",
+ pay:[[0,-0.6],[25,-0.6],[45,0.35],[100,0.35]],
+ dep:"The defined-risk bullish income default, especially on indices: trend + pullback + rich IV.",
+ tech:["ADX > 20–25 with +DI > −DI (real uptrend)","Price above rising 20/50 MA; entry ON the pullback to them","RSI 40–55 turning up; bullish candle trigger at support","Short strike below support; credit ≥ 1/3 width"],
+ dte:"30–45 DTE; exit by 21 DTE",ent:"Sell 25–30Δ put, buy 10–15Δ put",
+ sl:"Loss = 2× credit OR close below short strike. Trend flip (below 50 MA + DI cross) = exit regardless.",
+ tgt:"50% of credit.",
+ adj:["Roll out in time same strikes for credit if trend intact","Roll down only onto strong support; otherwise take the defined loss — that's what it's for"],
+ ex:"NIFTY @ 25,000 in uptrend, support 24,800: sell 24,800 PE ₹170, buy 24,500 PE ₹70 → credit 100 pts ≈ ₹7,500/lot; max loss 200 pts. Credit 100 ≥ 300/3 ✓. Target 50 pts; stop = close below 24,800.",
+ hi:"<b>क्या है:</b> support के नीचे Put बेचो + और नीचे का Put ख़रीदो — bullish income, नुक़सान fixed.<br><b>कब लगाएं:</b> साफ़ uptrend (ADX 20–25+, +DI ऊपर), pullback 20/50 MA पर आए, RSI 40–55 से मुड़े.<br><b>नियम:</b> credit spread की चौड़ाई का कम-से-कम 1/3 हो.<br><b>SL:</b> loss = 2× credit या short strike के नीचे close; trend पलटे तो बिना सोचे बाहर.<br><b>Target:</b> 50%.<br><b>Adjustment:</b> trend ठीक तो same strikes अगली expiry में roll; वरना छोटा loss लेकर निकलो — spread इसीलिए बनाया था."},
+{n:"Covered Call",g:"bul",r:"def",tr:["up","range"],iv:["high","low"],ev:true,st:4,best:"",thb:"THETA: MED",
+ why:"The most-studied selling strategy on earth (BXM): equity returns, lower volatility. Power capped by giving away the upside.",
+ pay:[[0,-1],[60,0.5],[100,0.5]],
+ dep:"Own the stock/ETF/futures, rent out the upside. Mild-bull/neutral on holdings, resistance overhead.",
+ tech:["Stock near known resistance / upper channel","RSI > 60–65 (stretched = richer call)","Sell AFTER an up-move, not after a dump","Stock's own IV Rank decent (>30)"],
+ dte:"30–45 DTE (monthlies)",ent:"Sell 20–30Δ call above resistance",
+ sl:"None on the option (covered). Risk lives in the stock — manage the holding's own stop.",
+ tgt:"50–80% of credit or let expire; re-sell next cycle.",
+ adj:["Stock rallies through strike: roll up + out for credit if keeping it, else deliver happily","Stock falls: premium cushions; do NOT sell the next call into a crash bottom"],
+ ex:"Hold NIFTYBEES / NIFTY futures with NIFTY @ 25,000, resistance 25,500: sell monthly 25,500 CE ₹90 ≈ ₹6,750/lot. NIFTY stays below 25,500 → keep premium; above → holdings profit to 25,500 + premium.",
+ hi:"<b>क्या है:</b> जो stock/ETF आपके पास है, उसके ऊपर का Call बेचकर किराया कमाओ.<br><b>कब लगाएं:</b> holding resistance के पास हो, RSI 60+ हो — तेज़ी के BAAD बेचो, गिरावट के बाद नहीं.<br><b>SL:</b> option पर नहीं — असली risk stock में है, उसका अपना stop रखो.<br><b>Target:</b> 50–80% या expiry; अगले महीने फिर बेचो.<br><b>Adjustment:</b> stock strike पार करे और रखना हो तो roll up+out; देना मंज़ूर हो तो ख़ुशी-ख़ुशी deliver करो. Crash के बाद अगला call मत बेचो — bounce छिन जाएगा."},
+{n:"The Wheel",g:"bul",r:"und",tr:["up","range"],iv:["high"],ev:false,st:4.5,best:"",thb:"THETA: MED (continuous)",
+ why:"Not one trade but a compounding premium machine: CSP and covered call in an endless loop on quality names.",
+ pay:[[0,-1],[40,0.3],[100,0.3]],
+ dep:"Process, not position: CSP → assignment → covered call → called away → repeat. Quality names you'd hold through a cycle.",
+ tech:["All CSP checks for the entry leg","All covered-call checks after assignment","Fundamental quality gate (see fundamental-screener page)"],
+ dte:"30–45 DTE each leg",ent:"Rotate the two structures above",
+ sl:"The stock thesis is the stop: structural breakdown (below 200 DMA on volume) exits the WHOLE wheel, not just a leg.",
+ tgt:"Cycle yield: track annualized premium + dividends vs buy-and-hold.",
+ adj:["Assigned high: sell calls at/above cost basis only","Reduce call delta in strong uptrends so shares aren't called away cheap"],
+ ex:"RELIANCE-type quality stock: sell 30–45 DTE put at support → if assigned, hold + sell calls above cost → called away → repeat. (Index version: NIFTY 24,500 PE → if ITM, take futures/BEES exposure + sell 25,500 CE.)",
+ hi:"<b>क्या है:</b> पहिया — पहले Put बेचो; मिल जाए तो stock रखो और Call बेचो; निकल जाए तो फिर Put बेचो. चक्र चलता रहता है.<br><b>कब लगाएं:</b> सिर्फ़ quality stocks पर जिन्हें साल-दो-साल रखने में दिक़्क़त न हो.<br><b>SL:</b> पूरे wheel का stop stock की thesis है — 200 DMA volume के साथ टूटे तो पूरा पहिया बंद.<br><b>Target:</b> सालाना premium + dividend yield को buy-and-hold से compare करते रहो.<br><b>Adjustment:</b> महँगे भाव पर assignment हुई तो cost से ऊपर के ही Call बेचो."},
+{n:"Jade Lizard",g:"bul",r:"und",tr:["up","range"],iv:["high"],ev:false,st:4,best:"",thb:"THETA: HIGH",
+ why:"Cleverest structure in the book: built right, upside risk is literally ZERO while collecting strangle-like theta.",
+ pay:[[0,-1],[35,0.4],[60,0.4],[78,0.12],[100,0.12]],
+ dep:"Post-selloff bounce with fat put skew: short put + short call spread, total credit > call-spread width ⇒ zero upside risk.",
+ tech:["Sharp dip: RSI < 35 then turning up, at support","Put IV pumped vs calls (steep skew)","Resistance overhead to park the call spread above","IV Rank > 50"],
+ dte:"30–45 DTE",ent:"Sell 25–30Δ put + sell 25Δ/buy 20Δ call spread; TOTAL credit > call-spread width (non-negotiable)",
+ sl:"Put side only: 2× credit or support break. Upside is structurally riskless if built right.",
+ tgt:"50% of total credit.",
+ adj:["Rally: call spread pins at a small capped cost ≤ credit — let the put decay","Drop: manage like a CSP (roll down/out); close the call spread cheap and re-sell lower"],
+ ex:"NIFTY dips to 24,600, bounces at support: sell 24,300 PE ₹110 + sell 25,300 CE ₹65 / buy 25,400 CE ₹45 → total credit 130 pts > call width 100 ✓ ⇒ no upside risk. ≈ ₹9,750/lot. Stop only on put side (support break).",
+ hi:"<b>क्या है:</b> Put बेचो + ऊपर एक छोटा Call spread बेचो. अगर total credit call spread की चौड़ाई से ज़्यादा है, तो ऊपर जाने पर loss हो ही नहीं सकता.<br><b>कब लगाएं:</b> तेज़ गिरावट के बाद bounce पर — RSI 35 से मुड़े, Put महँगे (skew), ऊपर resistance साफ़ हो.<br><b>SL:</b> सिर्फ़ put side पर — support टूटे या loss 2× credit.<br><b>Target:</b> total credit का 50%.<br><b>Adjustment:</b> ऊपर भागे तो call spread छोटा-सा capped cost लेगा, put घिसता रहेगा; नीचे आए तो CSP की तरह roll करो."},
+{n:"Put Ratio Spread (front)",g:"bul",r:"und",tr:["range","down"],iv:["high"],ev:false,st:3,best:"",thb:"THETA: MED",
+ why:"A skew harvester with a hidden fang: free/credit entry and a fat peak, but the crash below the shorts is real tail risk.",
+ pay:[[0,-1],[30,0.6],[50,0.08],[100,0.08]],
+ dep:"Buy 1 put, sell 2 lower: mild drift-down or sideways expected, NOT a crash. Often zero cost or a small credit.",
+ tech:["Put skew unusually steep (OTM put IV ≫ ATM)","Defined support at/above the short strikes","Calm vol regime: India VIX not spiking, no event window"],
+ dte:"30–60 DTE",ent:"Buy ~35–40Δ put, sell 2× ~20–25Δ puts, net zero/credit",
+ sl:"Underlying below short strike minus credit (lower breakeven) OR a VIX-spike filter triggers — crash risk IS the risk.",
+ tgt:"Max profit = pin at short strike near expiry; realistically close at 30–50% of max.",
+ adj:["Buy back ONE short put on a fast drop (→ plain debit spread, crash risk gone)","Take the free win if price sits between strikes late"],
+ ex:"NIFTY @ 25,000: buy 24,800 PE ₹150, sell 2× 24,400 PE ₹80 → net credit 10 pts. Best case: NIFTY at 24,400 at expiry = 410 pts. Risk starts below ~24,000. Stop: VIX spike or below 24,200.",
+ hi:"<b>क्या है:</b> एक Put ख़रीदो, दो नीचे के Put बेचो — अक्सर मुफ़्त या हल्के credit में. हल्की गिरावट पर मोटा profit.<br><b>कब लगाएं:</b> जब Put skew बहुत महँगा हो और हल्की गिरावट/sideways की उम्मीद हो — crash की नहीं.<br><b>ख़तरा:</b> असली risk नीचे के naked Put में है — crash आया तो loss बढ़ता जाता है.<br><b>SL:</b> lower breakeven के नीचे या VIX अचानक उछले — तुरंत action.<br><b>Adjustment:</b> तेज़ गिरावट में एक short Put वापस ख़रीद लो — बचा हुआ simple spread बन जाता है, crash risk ख़त्म."},
+{n:"Broken Wing Butterfly (put, credit)",g:"bul",r:"def",tr:["up","range"],iv:["high"],ev:true,st:3.5,best:"",thb:"THETA: MED",
+ why:"The 'free butterfly' trick: enter for credit, roll the broken wing in, and you own a fly that cannot lose.",
+ pay:[[0,-0.45],[15,-0.45],[35,0.6],[52,0.15],[100,0.15]],
+ dep:"Slightly-bullish/neutral with high IV: butterfly with the far wing bought wider, entered for a credit ⇒ no upside risk, defined downside.",
+ tech:["Same regime read as bull put spread","High IV Rank (>50) so the credit form exists","Body strikes at/below support"],
+ dte:"30–45 DTE",ent:"Buy 1 put, sell 2 lower, buy 1 much lower (wider gap); net credit",
+ sl:"Defined by structure; exit if loss = 2× credit or the body is breached early.",
+ tgt:"25–50%; tastytrade pattern: roll the broken wing in for < credit ⇒ free butterfly that cannot lose.",
+ adj:["The free-fly roll IS the adjustment","Otherwise manage like a bull put spread"],
+ ex:"NIFTY @ 25,000: buy 24,900 PE, sell 2× 24,600 PE, buy 24,100 PE (wings 300/500) for ~15 pts net credit. Upside: keep 15. Peak at 24,600. Later roll 24,100 → 24,300 for <15 ⇒ risk-free fly.",
+ hi:"<b>क्या है:</b> Butterfly जिसका दूर वाला wing और दूर ख़रीदा जाता है — इसीलिए entry पर credit मिलता है. ऊपर risk zero, नीचे fixed.<br><b>कब लगाएं:</b> हल्की bullish/neutral राय + ऊँचा IV Rank. Body support पर/नीचे रखो.<br><b>SL:</b> loss = 2× credit या body जल्दी टूटे.<br><b>Target:</b> 25–50%; या मशहूर trick — broken wing को credit से कम में अंदर roll करो, बची butterfly कभी loss नहीं दे सकती.<br><b>Adjustment:</b> वही free-fly roll ही असली adjustment है."},
+{n:"Bear Call Credit Spread",g:"ber",r:"def",tr:["down"],iv:["high"],ev:true,st:4,best:"#1 BEARISH",thb:"THETA: MED",
+ why:"The best (and basically only sane) bearish premium trade: sell the rally into resistance, risk capped against the market's upward grind.",
+ pay:[[0,0.35],[55,0.35],[75,-0.6],[100,-0.6]],
+ dep:"THE bearish income structure. Sell rallies into resistance inside a downtrend. Use this, not naked calls.",
+ tech:["ADX > 20–25 with −DI > +DI (real downtrend)","Price below falling 20/50 MA; entry on the RALLY into them","RSI 55–65 rolling over at resistance; bearish candle trigger","Short strike above resistance; credit ≥ 1/3 width"],
+ dte:"30–45 DTE; exit by 21 DTE",ent:"Sell 25–30Δ call, buy 10–15Δ call",
+ sl:"Loss = 2× credit OR close above short strike OR trend flips (above 50 MA + DI cross). Indices grind UP — exit bearish trades faster.",
+ tgt:"50% of credit.",
+ adj:["Roll out in time if the downtrend is intact","Do NOT chase price upward with rolls — one roll max, then take the loss"],
+ ex:"NIFTY downtrend, resistance 25,200: on a rally to 25,000 sell 25,200 CE ₹160, buy 25,500 CE ₹55 → credit 105 pts ≈ ₹7,875/lot; max loss 195. Credit 105 ≥ 300/3 ✓. Stop: close above 25,200.",
+ hi:"<b>क्या है:</b> resistance के ऊपर Call बेचो + और ऊपर का Call ख़रीदो — गिरते market में income, loss fixed.<br><b>कब लगाएं:</b> साफ़ downtrend (ADX 20+, −DI ऊपर) में जब price गिरते हुए MA/resistance तक उछले और RSI 55–65 से मुड़े.<br><b>SL:</b> loss = 2× credit, short strike के ऊपर close, या trend पलटे. याद रखो — index की फ़ितरत ऊपर जाने की है, bearish trade जल्दी काटो.<br><b>Target:</b> 50%.<br><b>Adjustment:</b> ज़्यादा-से-ज़्यादा एक roll; price का पीछा मत करो."},
+{n:"Call Ratio Spread (front)",g:"ber",r:"und",tr:["range","down"],iv:["high"],ev:false,st:2.5,best:"",thb:"THETA: MED",
+ why:"Weakest card in the deck for indices: the naked upper call fights the market's melt-up bias. Handle only with strict breakout stops.",
+ pay:[[0,0.08],[50,0.08],[70,0.6],[100,-1]],
+ dep:"Mirror of the put ratio: buy 1 call, sell 2 higher. Neutral-to-mild-up drift; melt-UP is the risk (real on indices — be stricter).",
+ tech:["Call skew rich (event/short-covering premium)","Strong resistance at/above the short strikes","No breakout structure forming (no BB squeeze + rising volume)"],
+ dte:"30–60 DTE",ent:"Buy ~35Δ call, sell 2× ~20Δ calls, net zero/credit",
+ sl:"Above the upper breakeven or breakout confirmation (close above resistance on volume) — whichever FIRST.",
+ tgt:"Pin at the short strike; close at 30–50% of max.",
+ adj:["Buy back one short call on breakout (→ debit spread)","Never sit on naked upside through a rally"],
+ ex:"NIFTY @ 25,000, strong resistance 25,600: buy 25,200 CE ₹140, sell 2× 25,600 CE ₹75 → credit 10 pts. Best: NIFTY 25,600 at expiry = 410 pts. Stop: volume close above 25,600.",
+ hi:"<b>क्या है:</b> एक Call ख़रीदो, दो ऊपर के Call बेचो. हल्की तेज़ी/sideways में profit, पर ऊपर naked Call का ख़तरा.<br><b>कब लगाएं:</b> जब Call premium महँगा हो और ऊपर पक्का resistance हो. Breakout बनता दिखे (BB squeeze + volume) तो बिलकुल नहीं.<br><b>SL:</b> resistance के ऊपर volume-close या upper breakeven — जो पहले आए.<br><b>Adjustment:</b> breakout पर एक short Call तुरंत वापस ख़रीदो — बाक़ी simple spread बन जाता है. Rally में naked upside लेकर कभी मत बैठो."},
+{n:"0–2 DTE Expiry Strangle / Condor",g:"tim",r:"und",tr:["range"],iv:["high","low"],ev:false,st:3,best:"FASTEST THETA",thb:"THETA: EXTREME",
+ why:"Highest theta-per-hour in existence — and the exact trade where SEBI's 91% lose. Power 5, survivability 2, net 3. Hard stops or don't touch it.",
+ pay:[[0,-0.9],[25,0.35],[75,0.35],[100,-0.9]],
+ dep:"Harvest the steep end of theta on weekly index expiry (ATM 0DTE sheds >50% premium in hours). Advanced. Condor version for defined risk.",
+ tech:["Opening range established (first 15–30 min), price inside it","Strikes beyond the day's expected move (ATM straddle price) AND beyond OI walls","Flat VWAP, balanced tape; India VIX not spiking today","NO event day (RBI/budget/global print)"],
+ dte:"0–2 DTE, intraday hold",ent:"Post-opening-range: sell strangle beyond OI walls / expected move",
+ sl:"HARD 1.5–2× credit or short-strike touch — as a placed order, not a mental note. Gamma gives no second chances on expiry day.",
+ tgt:"25–50% by early afternoon, or scratch by ~2:30 pm — don't hold the last hour's lottery unless hedged.",
+ adj:["Shift the tested side once at most","After that: exit. 0DTE 'adjustment' is mostly a myth — cut instead"],
+ ex:"Expiry day, NIFTY @ 25,000, ATM straddle ₹120 (expected move ±120), OI walls 25,200/24,800: after 9:45 sell 25,250 CE ₹25 + 24,750 PE ₹28 → 53 pts ≈ ₹3,975/lot. SL order at combined ₹105. Book ₹25–40 by 1 pm.",
+ hi:"<b>क्या है:</b> expiry के दिन दोनों तरफ़ दूर के options बेचना — theta सबसे तेज़ यहीं घिसता है (ATM option दो घंटे में आधा हो सकता है).<br><b>कब लगाएं:</b> शांत expiry day — opening range बन जाए, VWAP flat हो, VIX ठंडा हो, कोई event न हो. Strikes expected move और OI walls के बाहर.<br><b>SL:</b> यह mental नहीं, SYSTEM में लगा order होना चाहिए — 1.5–2× credit या strike touch. यहीं 91% वाले मरते हैं.<br><b>Target:</b> दोपहर तक 25–50%, आख़िरी घंटे का लालच नहीं.<br><b>Adjustment:</b> एक बार side shift, बस. दूसरी बार = exit."},
+{n:"Event IV-Crush Play",g:"tim",r:"def",tr:["up","range","down"],iv:["high"],ev:true,st:3.5,best:"",thb:"VEGA PLAY",
+ why:"A vega trade wearing a theta costume: you're selling the fear, not the time. Defined-risk into the event or naked only after it.",
+ pay:[[0,-0.5],[20,-0.5],[50,0.6],[80,-0.5],[100,-0.5]],
+ dep:"Two legal versions: (a) INTO the event with defined risk only (iron fly/condor over RBI, budget, earnings); (b) AFTER the event, sell the still-bloated IV the moment uncertainty resolves.",
+ tech:["Event premium visible: front IV ≫ back IV; straddle pricing > historical event move","(a) breakevens beyond the LARGEST recent event move","(b) post-event: direction resolved, IV still above pre-event norm"],
+ dte:"Event week; exit within 1–2 days after",ent:"(a) iron fly/condor before the event close; (b) strangle/spread next morning",
+ sl:"(a) capped by wings — size so max loss ≤ 1% capital; (b) standard 1.5–2× credit.",
+ tgt:"The crush itself: 25–50% within a day or two. This is a vega trade, not a theta campaign.",
+ adj:["None into the event (that's what the wings are for)","Post-event trades manage like normal strangles"],
+ ex:"RBI policy tomorrow, NIFTY @ 25,000, weekly straddle ₹260 vs avg RBI-day move ~₹150: sell iron fly 25,000 ± wings 24,500/25,500, credit ~₹190, max loss ~₹310 (size ≤1% capital). Exit morning after — IV crush does the work.",
+ hi:"<b>क्या है:</b> बड़े event (RBI, Budget, results) से पहले options में डर का premium भर जाता है; event निपटते ही IV crash होता है — वही बेचना है.<br><b>दो तरीक़े:</b> (a) event से पहले सिर्फ़ defined-risk (iron fly/condor) — wings ज़रूरी; (b) event के बाद सुबह, जब direction साफ़ हो पर IV अब भी फूला हो.<br><b>SL:</b> (a) wings ने बाँध रखा है — बस size इतना कि max loss capital का 1%; (b) सामान्य 1.5–2× credit.<br><b>Target:</b> 1–2 दिन में 25–50% — यह theta नहीं, vega का सौदा है.<br><b>Adjustment:</b> event के आर-पार कोई adjustment नहीं — इसीलिए wings ख़रीदे थे."}
+];
+
+const grid=document.getElementById('grid');
+const gName={neu:["NEUTRAL","t-neu"],bul:["BULLISH","t-bul"],ber:["BEARISH","t-ber"],tim:["TIME/EVENT","t-tim"]};
+S.forEach((s,i)=>{
+  const d=document.createElement('div');d.className='card';d.id='c'+i;
+  const[gl,gc]=gName[s.g];
+  d.innerHTML=`<h3>${s.n} <span class="tag ${gc}">${gl}</span> <span class="risk ${s.r==='def'?'r-def':'r-und'}">${s.r==='def'?'DEFINED RISK':'UNDEFINED RISK'}</span></h3>
+  <div class="rate"><span class="stars">${starStr(s.st)}</span><span style="color:var(--dim);font-size:12px">${s.st}/5</span>${s.best?`<span class="best">${s.best}</span>`:''}<span class="theta">${s.thb}</span></div>
+  <div class="why">${s.why}</div>
+  <div class="pay">${payoffSVG(s.pay)}<div class="paycap">Payoff at expiry (P/L vs price)</div></div>
+  <div class="sec deploy"><b>Deploy when</b><div>${s.dep}</div></div>
+  <div class="sec tech"><b>Technical checklist</b><ul>${s.tech.map(t=>`<li>${t}</li>`).join('')}</ul></div>
+  <div class="sec dte"><b>Days (DTE)</b><div>${s.dte} &nbsp;·&nbsp; <i>${s.ent}</i></div></div>
+  <div class="sec sl"><b>Stop-loss</b><div>${s.sl}</div></div>
+  <div class="sec tgt"><b>Target</b><div>${s.tgt}</div></div>
+  <div class="sec adj"><b>Adjustments</b><ul>${s.adj.map(t=>`<li>${t}</li>`).join('')}</ul></div>
+  <div class="sec ex"><b>NIFTY example / उदाहरण</b><div class="exbox">${s.ex}</div></div>
+  <div class="sec hin"><b>हिंदी में समझें</b><div class="hibox">${s.hi}</div></div>`;
+  grid.appendChild(d);
+});
+let trend=null,iv=null,ev='no';
+function paint(){
+  const v=document.getElementById('verdict');
+  if(!trend||!iv){document.querySelectorAll('.card').forEach(c=>{c.classList.remove('dim','hit')});
+    v.innerHTML='Select trend and IV to filter the playbook. / Trend और IV चुनें.';return;}
+  let hits=0,names=[];
+  S.forEach((s,i)=>{
+    const c=document.getElementById('c'+i);
+    let ok=s.tr.includes(trend)&&s.iv.includes(iv);
+    if(ev==='yes'&&!s.ev)ok=false;
+    c.classList.toggle('dim',!ok);c.classList.toggle('hit',ok);
+    if(ok){hits++;if(s.st>=4.5)names.push(s.n);}
+  });
+  let msg=`<b>${hits}</b> structure(s) match: <b>${trend}</b> trend + <b>${iv}</b> IV${ev==='yes'?' + event window (defined-risk only)':''}.`;
+  if(names.length)msg+=` Top-rated pick: <b>${names.join(', ')}</b>.`;
+  if(iv==='low'&&hits<=2)msg+=' <b>Low IV = mostly stand aside</b> — calendars or nothing is a position. / कम IV में बैठे रहना भी एक position है.';
+  v.innerHTML=msg;
+}
+document.querySelectorAll('.tr').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tr').forEach(x=>x.classList.remove('on'));b.classList.add('on');trend=b.dataset.v;paint();});
+document.querySelectorAll('.iv').forEach(b=>b.onclick=()=>{document.querySelectorAll('.iv').forEach(x=>x.classList.remove('on'));b.classList.add('on');iv=b.dataset.v;paint();});
+document.querySelectorAll('.ev').forEach(b=>b.onclick=()=>{document.querySelectorAll('.ev').forEach(x=>x.classList.remove('on'));b.classList.add('on');ev=b.dataset.v;paint();});
+</script>
+</body>
+</html>

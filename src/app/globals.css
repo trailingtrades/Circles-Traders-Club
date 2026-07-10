@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* Class-based dark mode (toggled on <html> by ThemeToggle) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Brand palette — Circles Traders Club */
+  --color-brand-50: #fdf8e7;
+  --color-brand-100: #faedbb;
+  --color-brand-400: #f5cd47;
+  --color-brand-500: #f0b90b;
+  --color-brand-600: #d9a509;
+  --color-brand-700: #a87f07;
+
+  --color-ink-50: #f6f7f9;
+  --color-ink-100: #eceef2;
+  --color-ink-200: #d9dde5;
+  --color-ink-300: #b7bfcc;
+  --color-ink-400: #8b93a7;
+  --color-ink-500: #5f6b83;
+  --color-ink-600: #46506a;
+  --color-ink-700: #333c52;
+  --color-ink-800: #1c2333;
+  --color-ink-850: #161b26;
+  --color-ink-900: #101623;
+  --color-ink-950: #0b0f18;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  @apply bg-ink-50 text-ink-800;
+}
+
+.dark body {
+  @apply bg-ink-950 text-ink-100;
+}
+
+/* Shared primitives */
+.card {
+  @apply rounded-xl border border-ink-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-850;
+}
+
+.input {
+  @apply w-full rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm text-ink-800 outline-none transition placeholder:text-ink-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-900 dark:text-ink-100;
+}
+
+.label {
+  @apply mb-1 block text-xs font-semibold tracking-wide text-ink-500 uppercase dark:text-ink-400;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply bg-brand-500 text-ink-900 hover:bg-brand-400;
+}
+
+.btn-secondary {
+  @apply border border-ink-300 bg-white text-ink-700 hover:border-brand-500 hover:text-ink-900 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-200 dark:hover:text-white;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white hover:bg-red-500;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold;
+}

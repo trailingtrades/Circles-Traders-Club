@@ -1,0 +1,196 @@
+// Prisma schema — Circles Traders Club LMS
+// PostgreSQL. Run `npx prisma migrate deploy` in production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Admins — separate identity from students, separate login.
+// ---------------------------------------------------------------------------
+model Admin {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions            Session[]
+  activityLogs        ActivityLog[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("admins")
+}
+
+// ---------------------------------------------------------------------------
+// Students — each has their own credentials and a subscription window.
+// ---------------------------------------------------------------------------
+enum StudentStatus {
+  ACTIVE // normal account; access still gated by subscription dates
+  DISABLED // temporarily disabled by admin; can be re-enabled
+  REVOKED // permanently revoked by admin
+}
+
+model Student {
+  id                String        @id @default(cuid())
+  fullName          String
+  email             String        @unique
+  passwordHash      String
+  mobile            String?
+  status            StudentStatus @default(ACTIVE)
+  subscriptionStart DateTime
+  subscriptionEnd   DateTime
+  notes             String?
+  courseId          String?
+  course            Course?       @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  lastLoginAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  sessions            Session[]
+  activityLogs        ActivityLog[]
+  passwordResetTokens PasswordResetToken[]
+  remindersSent       ReminderSent[]
+
+  @@index([status])
+  @@index([subscriptionEnd])
+  @@map("students")
+}
+
+// ---------------------------------------------------------------------------
+// Courses — one today (the Options Selling Playbook); schema supports many.
+// contentPath is relative to the protected /content directory on the server.
+// ---------------------------------------------------------------------------
+model Course {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  contentPath String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  students Student[]
+
+  @@map("courses")
+}
+
+// ---------------------------------------------------------------------------
+// Sessions — database-backed auth sessions. Cookie stores the raw token;
+// only the SHA-256 hash is persisted. Belongs to a student OR an admin.
+// ---------------------------------------------------------------------------
+model Session {
+  id           String   @id @default(cuid())
+  tokenHash    String   @unique
+  studentId    String?
+  student      Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  adminId      String?
+  admin        Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  remember     Boolean  @default(false)
+  ip           String?
+  userAgent    String?
+  device       String?
+  browser      String?
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+  expiresAt    DateTime
+
+  @@index([studentId])
+  @@index([adminId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Activity logs — full audit trail.
+// ---------------------------------------------------------------------------
+enum ActivityType {
+  STUDENT_LOGIN
+  STUDENT_LOGOUT
+  STUDENT_LOGIN_FAILED
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
+  ADMIN_LOGIN_FAILED
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  CONTENT_ACCESSED
+  ACCESS_DENIED_EXPIRED
+  STUDENT_CREATED
+  STUDENT_UPDATED
+  STUDENT_DELETED
+  STUDENT_DISABLED
+  STUDENT_ENABLED
+  STUDENT_REVOKED
+  SUBSCRIPTION_EXTENDED
+  PASSWORD_CHANGED_BY_ADMIN
+  FORCED_LOGOUT
+  BULK_OPERATION
+  REMINDER_EMAIL_SENT
+}
+
+model ActivityLog {
+  id        String       @id @default(cuid())
+  type      ActivityType
+  studentId String?
+  student   Student?     @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  adminId   String?
+  admin     Admin?       @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  ip        String?
+  userAgent String?
+  device    String?
+  browser   String?
+  detail    String?
+  createdAt DateTime     @default(now())
+
+  @@index([type])
+  @@index([studentId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Password reset tokens — single-use, short-lived, hash stored only.
+// ---------------------------------------------------------------------------
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  studentId String?
+  student   Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  adminId   String?
+  admin     Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([studentId])
+  @@map("password_reset_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Reminder tracking — prevents duplicate expiry-reminder emails.
+// ---------------------------------------------------------------------------
+enum ReminderKind {
+  DAYS_7
+  DAYS_3
+  DAYS_1
+  EXPIRED
+}
+
+model ReminderSent {
+  id              String       @id @default(cuid())
+  studentId       String
+  student         Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  kind            ReminderKind
+  subscriptionEnd DateTime
+  sentAt          DateTime     @default(now())
+
+  @@unique([studentId, kind, subscriptionEnd])
+  @@map("reminders_sent")
+}
