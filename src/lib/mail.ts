@@ -37,7 +37,13 @@ function layout(title: string, bodyHtml: string): string {
   </div></body></html>`;
 }
 
-async function send(to: string, subject: string, html: string) {
+export function smtpConfigured(): boolean {
+  return !!process.env.SMTP_HOST;
+}
+
+type SendResult = { ok: boolean; error?: string };
+
+async function send(to: string, subject: string, html: string): Promise<SendResult> {
   const transport = getTransport();
   const from = process.env.SMTP_FROM || `"${APP_NAME}" <no-reply@localhost>`;
   if (!transport) {
@@ -47,14 +53,33 @@ async function send(to: string, subject: string, html: string) {
         `${html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}\n` +
         (links.length ? `[mail:dev] Links: ${links.join(" ")}` : "")
     );
-    return;
+    return {
+      ok: false,
+      error: "SMTP is not configured (SMTP_HOST is empty) — the email was only printed to the server logs.",
+    };
   }
   try {
     await transport.sendMail({ from, to, subject, html });
+    return { ok: true };
   } catch (err) {
     // Email failures must not break the main flow; they are logged for ops.
     console.error(`[mail] failed to send "${subject}" to ${to}:`, err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+// Used by the admin panel's "Send test email" diagnostic.
+export async function sendTestEmail(to: string): Promise<SendResult> {
+  return send(
+    to,
+    `${APP_NAME} — test email ✔`,
+    layout(
+      "Email configuration test",
+      `<p>If you're reading this, SMTP is configured correctly and ${APP_NAME} can send
+       welcome emails, password resets and expiry reminders.</p>
+       <p style="color:#6b7280">Sent ${new Date().toUTCString()}</p>`
+    )
+  );
 }
 
 export async function sendWelcomeEmail(params: {
