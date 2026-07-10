@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { startOfToday } from "@/lib/student-filters";
+import { smtpConfigured } from "@/lib/mail";
+import EmailTestCard from "@/components/admin/EmailTestCard";
 
 export const metadata: Metadata = { title: "Admin Dashboard" };
 
@@ -124,6 +126,7 @@ export default async function AdminDashboard() {
             <p className="label">Live student sessions</p>
             <p className="text-3xl font-extrabold text-ink-900 dark:text-white">{liveSessions}</p>
           </div>
+          <EmailTestCard configured={smtpConfigured()} />
           <div className="card p-5">
             <h2 className="mb-3 font-bold text-ink-900 dark:text-white">Quick actions</h2>
             <div className="flex flex-col gap-2">
