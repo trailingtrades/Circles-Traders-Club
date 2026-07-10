@@ -38,12 +38,49 @@ function layout(title: string, bodyHtml: string): string {
 }
 
 export function smtpConfigured(): boolean {
-  return !!process.env.SMTP_HOST;
+  return !!process.env.BREVO_API_KEY || !!process.env.SMTP_HOST;
 }
 
 type SendResult = { ok: boolean; error?: string };
 
+// Parses 'Name <email@x>' or a bare address from SMTP_FROM.
+function parseFrom(): { name: string; email: string } {
+  const raw = process.env.SMTP_FROM || `${APP_NAME} <no-reply@localhost>`;
+  const m = raw.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1].trim() || APP_NAME, email: m[2].trim() };
+  return { name: APP_NAME, email: raw.trim() };
+}
+
+// Brevo transactional API over HTTPS (port 443) — works on hosts that block
+// outbound SMTP ports (e.g. Railway trial). Preferred when a key is set.
+async function sendViaBrevoApi(to: string, subject: string, html: string): Promise<SendResult> {
+  const sender = parseFrom();
+  try {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": process.env.BREVO_API_KEY!,
+        "Content-Type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({ sender, to: [{ email: to }], subject, htmlContent: html }),
+    });
+    if (!res.ok) {
+      const body = (await res.text()).slice(0, 400);
+      console.error(`[mail] Brevo API rejected "${subject}" to ${to}: ${res.status} ${body}`);
+      return { ok: false, error: `Brevo API ${res.status}: ${body}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error(`[mail] Brevo API failed for "${subject}" to ${to}:`, err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 async function send(to: string, subject: string, html: string): Promise<SendResult> {
+  if (process.env.BREVO_API_KEY) {
+    return sendViaBrevoApi(to, subject, html);
+  }
   const transport = getTransport();
   const from = process.env.SMTP_FROM || `"${APP_NAME}" <no-reply@localhost>`;
   if (!transport) {

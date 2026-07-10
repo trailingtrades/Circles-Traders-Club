@@ -6,7 +6,15 @@ type TestResponse = {
   ok: boolean;
   error?: string;
   to?: string;
-  config?: { configured: boolean; host: string; port: string; user: string; pass: string; from: string };
+  config?: {
+    configured: boolean;
+    transport?: string;
+    host: string;
+    port: string;
+    user: string;
+    pass: string;
+    from: string;
+  };
 };
 
 export default function EmailTestCard({ configured }: { configured: boolean }) {
@@ -64,7 +72,7 @@ export default function EmailTestCard({ configured }: { configured: boolean }) {
               <b>Failed:</b> {result.error}
               {result.config && (
                 <span className="mt-1 block text-[11px] opacity-80">
-                  host {result.config.host} · port {result.config.port} · user {result.config.user} ·
+                  {result.config.transport ? `via ${result.config.transport} · ` : ""}host {result.config.host} · port {result.config.port} · user {result.config.user} ·
                   pass {result.config.pass} · from {result.config.from}
                 </span>
               )}

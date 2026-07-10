@@ -15,8 +15,9 @@ export async function POST(req: NextRequest) {
 
     const config = {
       configured: smtpConfigured(),
-      host: process.env.SMTP_HOST || "(empty)",
-      port: process.env.SMTP_PORT || "587",
+      transport: process.env.BREVO_API_KEY ? "Brevo API (HTTPS)" : "SMTP",
+      host: process.env.BREVO_API_KEY ? "api.brevo.com" : process.env.SMTP_HOST || "(empty)",
+      port: process.env.BREVO_API_KEY ? "443" : process.env.SMTP_PORT || "587",
       user: process.env.SMTP_USER ? "(set)" : "(empty)",
       pass: process.env.SMTP_PASS ? "(set)" : "(empty)",
       from: process.env.SMTP_FROM || "(empty)",
