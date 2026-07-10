@@ -13,19 +13,33 @@ export type StudentFormValues = {
   subscriptionEnd: string; // YYYY-MM-DD
   feeTotal: number;
   feePaid: number;
+  materialAccess: "ALL" | "CUSTOM";
   notes?: string;
 };
+
+export type MaterialOption = {
+  id: string;
+  title: string;
+  type: string;
+  courseName: string;
+};
+
+const TYPE_ICONS: Record<string, string> = { HTML: "📖", VIDEO: "🎥", SHEET: "📊", LINK: "🔗" };
 
 export default function StudentForm({
   mode,
   studentId,
   initial,
   courses,
+  materials = [],
+  initialMaterialIds = [],
 }: {
   mode: "create" | "edit";
   studentId?: string;
   initial?: Partial<StudentFormValues>;
   courses: { id: string; name: string }[];
+  materials?: MaterialOption[];
+  initialMaterialIds?: string[];
 }) {
   const router = useRouter();
   const [values, setValues] = useState<StudentFormValues>({
@@ -40,8 +54,10 @@ export default function StudentForm({
       new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
     feeTotal: initial?.feeTotal ?? 0,
     feePaid: initial?.feePaid ?? 0,
+    materialAccess: initial?.materialAccess ?? "ALL",
     notes: initial?.notes ?? "",
   });
+  const [materialIds, setMaterialIds] = useState<Set<string>>(new Set(initialMaterialIds));
   const [sendWelcome, setSendWelcome] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -60,6 +76,7 @@ export default function StudentForm({
       const payload: Record<string, unknown> = { ...values };
       if (mode === "edit" && !values.password) delete payload.password;
       if (mode === "create") payload.sendWelcomeEmail = sendWelcome;
+      if (values.materialAccess === "CUSTOM") payload.materialIds = Array.from(materialIds);
 
       const res = await fetch(
         mode === "create" ? "/api/admin/students" : `/api/admin/students/${studentId}`,
@@ -183,6 +200,75 @@ export default function StudentForm({
             {values.feeTotal - values.feePaid <= 0 && " · settled"}
           </p>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-ink-200 p-4 dark:border-ink-700">
+        <label className="label">Material access</label>
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-700 dark:text-ink-200">
+            <input
+              type="radio"
+              name="materialAccess"
+              className="h-4 w-4 accent-brand-500"
+              checked={values.materialAccess === "ALL"}
+              onChange={() => set("materialAccess", "ALL")}
+            />
+            All materials of their course
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-700 dark:text-ink-200">
+            <input
+              type="radio"
+              name="materialAccess"
+              className="h-4 w-4 accent-brand-500"
+              checked={values.materialAccess === "CUSTOM"}
+              onChange={() => set("materialAccess", "CUSTOM")}
+            />
+            Only selected materials
+          </label>
+        </div>
+
+        {values.materialAccess === "CUSTOM" && (
+          <div className="mt-3 max-h-64 space-y-3 overflow-y-auto rounded-lg bg-ink-50 p-3 dark:bg-ink-900">
+            {materials.length === 0 ? (
+              <p className="text-sm text-ink-400">No materials exist yet — add some on the Materials page first.</p>
+            ) : (
+              Object.entries(
+                materials.reduce<Record<string, MaterialOption[]>>((acc, m) => {
+                  (acc[m.courseName] ||= []).push(m);
+                  return acc;
+                }, {})
+              ).map(([courseName, list]) => (
+                <div key={courseName}>
+                  <p className="mb-1 text-xs font-bold tracking-wide text-ink-400 uppercase">{courseName}</p>
+                  {list.map((m) => (
+                    <label
+                      key={m.id}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-ink-700 hover:bg-ink-100 dark:text-ink-200 dark:hover:bg-ink-800"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-brand-500"
+                        checked={materialIds.has(m.id)}
+                        onChange={() => {
+                          const next = new Set(materialIds);
+                          if (next.has(m.id)) next.delete(m.id);
+                          else next.add(m.id);
+                          setMaterialIds(next);
+                          setSaved(false);
+                        }}
+                      />
+                      {TYPE_ICONS[m.type] ?? "🔗"} {m.title}
+                    </label>
+                  ))}
+                </div>
+              ))
+            )}
+            <p className="text-xs text-ink-400">
+              {materialIds.size} material{materialIds.size === 1 ? "" : "s"} selected. The student
+              sees exactly these, regardless of course.
+            </p>
+          </div>
+        )}
       </div>
 
       <div>

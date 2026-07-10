@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getStudentSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { accessState, daysRemaining } from "@/lib/subscription";
+import { accessibleMaterial } from "@/lib/student-materials";
 import { embedUrlFor } from "@/lib/embeds";
 import { logActivity } from "@/lib/activity";
 import LogoutButton from "@/components/LogoutButton";
@@ -21,19 +21,9 @@ export default async function MaterialPage({ params }: { params: Promise<{ id: s
   const { student } = current;
   if (accessState(student) !== "ok") redirect("/expired");
 
-  const studentCourseId =
-    student.courseId ??
-    (
-      await prisma.course.findFirst({
-        where: { isActive: true },
-        orderBy: { createdAt: "asc" },
-        select: { id: true },
-      })
-    )?.id;
-
   const { id } = await params;
-  const material = await prisma.material.findUnique({ where: { id } });
-  if (!material || !material.isActive || material.courseId !== studentCourseId) notFound();
+  const material = await accessibleMaterial(student, id);
+  if (!material) notFound();
 
   const days = daysRemaining(student);
 
