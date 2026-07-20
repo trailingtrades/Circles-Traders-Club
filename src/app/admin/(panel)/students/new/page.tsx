@@ -5,7 +5,7 @@ import StudentForm from "@/components/admin/StudentForm";
 export const metadata: Metadata = { title: "Add Student" };
 
 export default async function NewStudentPage() {
-  const [courses, materials] = await Promise.all([
+  const [courses, materials, indicators] = await Promise.all([
     prisma.course.findMany({
       where: { isActive: true },
       select: { id: true, name: true },
@@ -15,6 +15,11 @@ export default async function NewStudentPage() {
       where: { isActive: true },
       include: { course: { select: { name: true } } },
       orderBy: [{ courseId: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.indicator.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, description: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     }),
   ]);
 
@@ -33,6 +38,7 @@ export default async function NewStudentPage() {
           type: m.type,
           courseName: m.course.name,
         }))}
+        indicators={indicators}
       />
     </div>
   );

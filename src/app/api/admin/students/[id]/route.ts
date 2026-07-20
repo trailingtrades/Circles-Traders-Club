@@ -22,6 +22,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       include: {
         course: { select: { id: true, name: true } },
         materialGrants: { select: { materialId: true } },
+        indicatorGrants: { select: { indicatorId: true } },
         sessions: {
           select: { id: true, ip: true, device: true, browser: true, lastActiveAt: true, createdAt: true },
           orderBy: { lastActiveAt: "desc" },
@@ -85,6 +86,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
         prisma.studentMaterialAccess.deleteMany({ where: { studentId: id } }),
         prisma.studentMaterialAccess.createMany({
           data: validIds.map((m) => ({ studentId: id, materialId: m.id })),
+          skipDuplicates: true,
+        }),
+      ]);
+    }
+
+    if (body.indicatorIds !== undefined) {
+      const validIndicators = await prisma.indicator.findMany({
+        where: { id: { in: body.indicatorIds } },
+        select: { id: true },
+      });
+      await prisma.$transaction([
+        prisma.studentIndicatorAccess.deleteMany({ where: { studentId: id } }),
+        prisma.studentIndicatorAccess.createMany({
+          data: validIndicators.map((i) => ({ studentId: id, indicatorId: i.id })),
           skipDuplicates: true,
         }),
       ]);

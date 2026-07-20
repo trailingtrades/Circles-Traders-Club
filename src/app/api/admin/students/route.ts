@@ -91,6 +91,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (body.indicatorIds?.length) {
+      const validIndicators = await prisma.indicator.findMany({
+        where: { id: { in: body.indicatorIds } },
+        select: { id: true },
+      });
+      await prisma.studentIndicatorAccess.createMany({
+        data: validIndicators.map((i) => ({ studentId: student.id, indicatorId: i.id })),
+        skipDuplicates: true,
+      });
+    }
+
     await logActivity({
       type: "STUDENT_CREATED",
       adminId: guard.admin.id,

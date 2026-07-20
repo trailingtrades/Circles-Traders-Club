@@ -26,6 +26,12 @@ export type MaterialOption = {
 
 const TYPE_ICONS: Record<string, string> = { HTML: "📖", VIDEO: "🎥", SHEET: "📊", LINK: "🔗" };
 
+export type IndicatorOption = {
+  id: string;
+  name: string;
+  description: string | null;
+};
+
 export default function StudentForm({
   mode,
   studentId,
@@ -33,6 +39,8 @@ export default function StudentForm({
   courses,
   materials = [],
   initialMaterialIds = [],
+  indicators = [],
+  initialIndicatorIds = [],
 }: {
   mode: "create" | "edit";
   studentId?: string;
@@ -40,6 +48,8 @@ export default function StudentForm({
   courses: { id: string; name: string }[];
   materials?: MaterialOption[];
   initialMaterialIds?: string[];
+  indicators?: IndicatorOption[];
+  initialIndicatorIds?: string[];
 }) {
   const router = useRouter();
   const [values, setValues] = useState<StudentFormValues>({
@@ -58,6 +68,7 @@ export default function StudentForm({
     notes: initial?.notes ?? "",
   });
   const [materialIds, setMaterialIds] = useState<Set<string>>(new Set(initialMaterialIds));
+  const [indicatorIds, setIndicatorIds] = useState<Set<string>>(new Set(initialIndicatorIds));
   const [sendWelcome, setSendWelcome] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -77,6 +88,7 @@ export default function StudentForm({
       if (mode === "edit" && !values.password) delete payload.password;
       if (mode === "create") payload.sendWelcomeEmail = sendWelcome;
       if (values.materialAccess === "CUSTOM") payload.materialIds = Array.from(materialIds);
+      payload.indicatorIds = Array.from(indicatorIds);
 
       const res = await fetch(
         mode === "create" ? "/api/admin/students" : `/api/admin/students/${studentId}`,
@@ -270,6 +282,39 @@ export default function StudentForm({
           </div>
         )}
       </div>
+
+      {indicators.length > 0 && (
+        <div className="rounded-xl border border-ink-200 p-4 dark:border-ink-700">
+          <label className="label">Indicator access (shown on the student's dashboard)</label>
+          <div className="max-h-48 space-y-1 overflow-y-auto">
+            {indicators.map((ind) => (
+              <label
+                key={ind.id}
+                className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-ink-700 hover:bg-ink-100 dark:text-ink-200 dark:hover:bg-ink-800"
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-brand-500"
+                  checked={indicatorIds.has(ind.id)}
+                  onChange={() => {
+                    const next = new Set(indicatorIds);
+                    if (next.has(ind.id)) next.delete(ind.id);
+                    else next.add(ind.id);
+                    setIndicatorIds(next);
+                    setSaved(false);
+                  }}
+                />
+                📈 {ind.name}
+                {ind.description && <span className="text-xs text-ink-400">— {ind.description}</span>}
+              </label>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-ink-400">
+            {indicatorIds.size} indicator{indicatorIds.size === 1 ? "" : "s"} granted. Display-only —
+            the student sees these listed on their dashboard, nothing is clickable.
+          </p>
+        </div>
+      )}
 
       <div>
         <label className="label">Notes (visible to admins only)</label>

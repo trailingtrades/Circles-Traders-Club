@@ -18,6 +18,7 @@ export default async function EditStudentPage({ params }: { params: Promise<{ id
         sessions: { orderBy: { lastActiveAt: "desc" } },
         activityLogs: { orderBy: { createdAt: "desc" }, take: 15 },
         materialGrants: { select: { materialId: true } },
+        indicatorGrants: { select: { indicatorId: true } },
       },
     }),
     prisma.course.findMany({
@@ -31,6 +32,11 @@ export default async function EditStudentPage({ params }: { params: Promise<{ id
       orderBy: [{ courseId: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
     }),
   ]);
+  const indicators = await prisma.indicator.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, description: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
   if (!student) notFound();
 
   const state = accessState(student);
@@ -67,6 +73,8 @@ export default async function EditStudentPage({ params }: { params: Promise<{ id
               courseName: m.course.name,
             }))}
             initialMaterialIds={student.materialGrants.map((g) => g.materialId)}
+            indicators={indicators}
+            initialIndicatorIds={student.indicatorGrants.map((g) => g.indicatorId)}
             initial={{
               fullName: student.fullName,
               email: student.email,
