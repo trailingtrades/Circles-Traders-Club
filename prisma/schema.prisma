@@ -67,10 +67,42 @@ model Student {
   passwordResetTokens PasswordResetToken[]
   remindersSent       ReminderSent[]
   materialGrants      StudentMaterialAccess[]
+  indicatorGrants     StudentIndicatorAccess[]
 
   @@index([status])
   @@index([subscriptionEnd])
   @@map("students")
+}
+
+// ---------------------------------------------------------------------------
+// Indicators — display-only entitlements. The dashboard shows students which
+// indicators are included in their plan; there is nothing to open or download,
+// the institute delivers the actual indicators separately.
+// ---------------------------------------------------------------------------
+model Indicator {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  studentGrants StudentIndicatorAccess[]
+
+  @@map("indicators")
+}
+
+model StudentIndicatorAccess {
+  id          String    @id @default(cuid())
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  indicatorId String
+  indicator   Indicator @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([studentId, indicatorId])
+  @@map("student_indicator_access")
 }
 
 // Explicit per-student material grants (used when materialAccess = CUSTOM).
@@ -198,6 +230,9 @@ enum ActivityType {
   COURSE_CREATED
   COURSE_UPDATED
   COURSE_DELETED
+  INDICATOR_CREATED
+  INDICATOR_UPDATED
+  INDICATOR_DELETED
 }
 
 model ActivityLog {

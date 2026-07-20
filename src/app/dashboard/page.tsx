@@ -31,6 +31,13 @@ export default async function DashboardPage() {
 
   const materials = await materialsForStudent(student);
 
+  const indicatorGrants = await prisma.studentIndicatorAccess.findMany({
+    where: { studentId: student.id, indicator: { isActive: true } },
+    include: { indicator: true },
+    orderBy: { indicator: { sortOrder: "asc" } },
+  });
+  const indicators = indicatorGrants.map((g) => g.indicator);
+
   const days = daysRemaining(student);
   const expiringSoon = days <= 7;
   const typeMeta: Record<string, { icon: string; label: string }> = {
@@ -129,6 +136,39 @@ export default async function DashboardPage() {
           </ul>
         )}
       </div>
+
+      {indicators.length > 0 && (
+        <div className="card mt-6 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-bold text-ink-900 dark:text-white">Your indicators</h2>
+            <span className="badge bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400">
+              {indicators.length} INCLUDED
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            These indicators are included in your plan. The institute provides access and setup
+            for them separately.
+          </p>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+            {indicators.map((ind) => (
+              <li
+                key={ind.id}
+                className="flex items-start gap-2 rounded-lg bg-ink-50 px-3 py-2 dark:bg-ink-900"
+              >
+                <span className="mt-0.5 text-emerald-600 dark:text-emerald-400">✔</span>
+                <span>
+                  <span className="block text-sm font-semibold text-ink-900 dark:text-white">
+                    📈 {ind.name}
+                  </span>
+                  {ind.description && (
+                    <span className="block text-xs text-ink-500 dark:text-ink-400">{ind.description}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <p className="mt-8 text-center text-xs text-ink-400">
         Signed in as {student.email}. This material is licensed to you personally — sharing your

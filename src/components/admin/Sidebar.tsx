@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/students/import", label: "Import CSV", icon: "📥" },
   { href: "/admin/courses", label: "Courses", icon: "🎓" },
   { href: "/admin/materials", label: "Materials", icon: "📚" },
+  { href: "/admin/indicators", label: "Indicators", icon: "📈" },
   { href: "/admin/logs", label: "Activity Logs", icon: "🗒️" },
 ];
 

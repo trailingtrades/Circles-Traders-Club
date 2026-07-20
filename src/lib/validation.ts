@@ -46,6 +46,7 @@ export const studentCreateSchema = z.object({
   feePaid: feeAmount.optional().default(0),
   materialAccess: z.enum(["ALL", "CUSTOM"]).optional().default("ALL"),
   materialIds: z.array(z.string().min(1)).max(500).optional(),
+  indicatorIds: z.array(z.string().min(1)).max(500).optional(),
   notes: z.string().max(2000).optional().or(z.literal("").transform(() => undefined)),
   sendWelcomeEmail: z.boolean().optional().default(true),
 });
@@ -68,8 +69,23 @@ export const studentUpdateSchema = z.object({
   feePaid: feeAmount.optional(),
   materialAccess: z.enum(["ALL", "CUSTOM"]).optional(),
   materialIds: z.array(z.string().min(1)).max(500).optional(),
+  indicatorIds: z.array(z.string().min(1)).max(500).optional(),
   notes: z.string().max(2000).nullable().optional(),
   status: z.enum(["ACTIVE", "DISABLED", "REVOKED"]).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Indicators (display-only entitlements)
+// ---------------------------------------------------------------------------
+export const indicatorCreateSchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  description: z.string().max(500).optional().or(z.literal("").transform(() => undefined)),
+});
+
+export const indicatorUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(200).optional(),
+  description: z.string().max(500).nullable().optional(),
+  isActive: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------
