@@ -160,7 +160,8 @@ model Material {
   title       String
   description String?
   type        MaterialType
-  contentPath String? // HTML: path relative to /content
+  contentPath String? // HTML (legacy): path relative to /content
+  htmlContent String? @db.Text // HTML (uploaded): the file's contents, stored in the DB
   url         String? // VIDEO / SHEET / LINK: external URL
   sortOrder   Int          @default(0)
   isActive    Boolean      @default(true)

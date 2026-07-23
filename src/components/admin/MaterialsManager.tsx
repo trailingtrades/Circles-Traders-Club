@@ -13,10 +13,11 @@ type Material = {
   url: string | null;
   sortOrder: number;
   isActive: boolean;
+  hasHtmlContent?: boolean;
 };
 
 const TYPE_META: Record<Material["type"], { icon: string; label: string; hint: string }> = {
-  HTML: { icon: "📖", label: "HTML material", hint: "File inside the protected content/ folder, e.g. options-selling-playbook.html" },
+  HTML: { icon: "📖", label: "HTML study file", hint: "Upload a .html file — it is stored securely and served only to authorised students." },
   VIDEO: { icon: "🎥", label: "Recorded lecture", hint: "YouTube or Vimeo link, e.g. https://youtu.be/XXXX or https://vimeo.com/123456" },
   SHEET: { icon: "📊", label: "Google Sheet", hint: "Google Sheets share link (set the sheet to: Anyone with the link → Viewer)" },
   LINK: { icon: "🔗", label: "External link", hint: "Any https:// resource — opens in a new tab" },
@@ -42,7 +43,9 @@ export default function MaterialsManager({
   const router = useRouter();
   const [materials, setMaterials] = useState(initialMaterials);
   const [form, setForm] = useState({ ...EMPTY, courseId: courses[0]?.id ?? "" });
+  const [file, setFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingType, setEditingType] = useState<Material["type"] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -54,6 +57,8 @@ export default function MaterialsManager({
 
   function startEdit(m: Material) {
     setEditingId(m.id);
+    setEditingType(m.type);
+    setFile(null);
     setForm({
       courseId: m.courseId,
       title: m.title,
@@ -69,6 +74,8 @@ export default function MaterialsManager({
 
   function cancelEdit() {
     setEditingId(null);
+    setEditingType(null);
+    setFile(null);
     setForm({ ...EMPTY, courseId: courses[0]?.id ?? "" });
   }
 
@@ -77,14 +84,37 @@ export default function MaterialsManager({
     setBusy(true);
     setNotice(null);
     try {
-      const res = await fetch(
-        editingId ? `/api/admin/materials/${editingId}` : "/api/admin/materials",
-        {
-          method: editingId ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+      const isHtml = form.type === "HTML";
+      let res: Response;
+
+      if (isHtml) {
+        // HTML materials are uploaded as a file (stored in the DB).
+        if (!editingId && !file) {
+          setNotice("✗ Choose an .html file to upload");
+          setBusy(false);
+          return;
         }
-      );
+        const fd = new FormData();
+        fd.append("courseId", form.courseId);
+        fd.append("title", form.title);
+        fd.append("description", form.description);
+        fd.append("sortOrder", String(form.sortOrder));
+        if (file) fd.append("file", file);
+        res = await fetch(
+          editingId ? `/api/admin/materials/${editingId}` : "/api/admin/materials",
+          { method: editingId ? "PUT" : "POST", body: fd }
+        );
+      } else {
+        res = await fetch(
+          editingId ? `/api/admin/materials/${editingId}` : "/api/admin/materials",
+          {
+            method: editingId ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          }
+        );
+      }
+
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setNotice(`✗ ${data.error || "Save failed"}`);
@@ -168,7 +198,11 @@ export default function MaterialsManager({
             <select
               className="input"
               value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as Material["type"] })}
+              disabled={!!editingId}
+              onChange={(e) => {
+                setForm({ ...form, type: e.target.value as Material["type"] });
+                setFile(null);
+              }}
             >
               {Object.entries(TYPE_META).map(([k, v]) => (
                 <option key={k} value={k}>{v.icon} {v.label}</option>
@@ -199,15 +233,26 @@ export default function MaterialsManager({
 
         {form.type === "HTML" ? (
           <div>
-            <label className="label">Content file *</label>
+            <label className="label">
+              HTML file {editingId ? "(leave empty to keep the current file)" : "*"}
+            </label>
             <input
+              type="file"
+              accept=".html,.htm,text/html"
               className="input"
-              required
-              value={form.contentPath}
-              onChange={(e) => setForm({ ...form, contentPath: e.target.value })}
-              placeholder="options-selling-playbook.html"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-            <p className="mt-1 text-xs text-ink-400">{meta.hint}</p>
+            <p className="mt-1 text-xs text-ink-400">
+              {meta.hint} Max 5 MB.
+              {editingId && form.contentPath && !file
+                ? " Currently using a built-in file."
+                : ""}
+            </p>
+            {file && (
+              <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                Selected: {file.name} ({(file.size / 1024).toFixed(0)} KB)
+              </p>
+            )}
           </div>
         ) : (
           <div>
@@ -263,7 +308,13 @@ export default function MaterialsManager({
                   </td>
                   <td className="p-3 whitespace-nowrap">{TYPE_META[m.type].icon} {m.type}</td>
                   <td className="max-w-xs truncate p-3 text-xs text-ink-500 dark:text-ink-400">
-                    {m.type === "HTML" ? m.contentPath : m.url}
+                    {m.type === "HTML"
+                      ? m.hasHtmlContent
+                        ? "📎 Uploaded file"
+                        : m.contentPath
+                          ? `📄 ${m.contentPath}`
+                          : "— no content —"
+                      : m.url}
                   </td>
                   <td className="p-3">
                     {m.isActive ? (
