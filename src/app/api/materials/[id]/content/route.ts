@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStudentSession } from "@/lib/auth";
 import { accessState } from "@/lib/subscription";
 import { accessibleMaterial } from "@/lib/student-materials";
-import { loadCourseHtml } from "@/lib/course-content";
+import { renderMaterialHtml } from "@/lib/course-content";
 import { logActivity } from "@/lib/activity";
 
 // Serves an HTML material — same gating as /api/course/content: valid session,
@@ -25,16 +25,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   // Per-student authorisation (course membership or explicit custom grant).
   const material = await accessibleMaterial(student, id);
-  if (!material || material.type !== "HTML" || !material.contentPath) {
+  if (!material || material.type !== "HTML") {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  let html: string;
+  let html: string | null;
   try {
-    html = await loadCourseHtml(material.contentPath, student);
+    html = await renderMaterialHtml(material, student);
   } catch (err) {
     console.error("Failed to load material content:", err);
     return new NextResponse("Content unavailable", { status: 500 });
+  }
+  if (!html) {
+    return new NextResponse("This material has no content yet.", { status: 404 });
   }
 
   await logActivity({

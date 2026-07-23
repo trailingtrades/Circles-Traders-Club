@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { accessState } from "@/lib/subscription";
-import { loadCourseHtml } from "@/lib/course-content";
+import { loadCourseHtml, injectProtections } from "@/lib/course-content";
 import { logActivity } from "@/lib/activity";
 
 // The ONLY way to reach the learning material. Requires a valid session AND
@@ -33,22 +33,25 @@ export async function GET() {
     return new NextResponse("No course assigned. Please contact the institute.", { status: 404 });
   }
 
-  // Prefer the legacy course-level file; fall back to the first HTML material.
-  let contentPath = course.contentPath;
-  if (!contentPath) {
-    const firstHtml = await prisma.material.findFirst({
-      where: { courseId: course.id, type: "HTML", isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    });
-    contentPath = firstHtml?.contentPath ?? null;
-  }
-  if (!contentPath) {
-    return new NextResponse("This course has no study material yet.", { status: 404 });
-  }
-
   let html: string;
   try {
-    html = await loadCourseHtml(contentPath, student);
+    if (course.contentPath) {
+      // Legacy course-level file (the seeded playbook).
+      html = await loadCourseHtml(course.contentPath, student);
+    } else {
+      // Fall back to the first HTML material (DB-stored or file-based).
+      const firstHtml = await prisma.material.findFirst({
+        where: { courseId: course.id, type: "HTML", isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      });
+      if (firstHtml?.htmlContent) {
+        html = injectProtections(firstHtml.htmlContent, student);
+      } else if (firstHtml?.contentPath) {
+        html = await loadCourseHtml(firstHtml.contentPath, student);
+      } else {
+        return new NextResponse("This course has no study material yet.", { status: 404 });
+      }
+    }
   } catch (err) {
     console.error("Failed to load course content:", err);
     return new NextResponse("Course content unavailable", { status: 500 });

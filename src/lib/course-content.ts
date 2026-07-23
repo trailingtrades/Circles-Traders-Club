@@ -1,6 +1,7 @@
 import "server-only";
 import { readFile } from "fs/promises";
 import path from "path";
+import type { Material } from "@prisma/client";
 
 // Learning material lives in /content — OUTSIDE the public web root. It is
 // never served statically; the only way to reach it is the authenticated,
@@ -8,6 +9,8 @@ import path from "path";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
 
+// Reads a legacy content file from /content (the seeded playbook) and injects
+// the per-student protections.
 export async function loadCourseHtml(
   contentPath: string,
   student: { fullName: string; email: string }
@@ -17,7 +20,17 @@ export async function loadCourseHtml(
   if (!resolved.startsWith(CONTENT_DIR + path.sep)) {
     throw new Error("Invalid content path");
   }
-  let html = await readFile(resolved, "utf8");
+  const raw = await readFile(resolved, "utf8");
+  return injectProtections(raw, student);
+}
+
+// Injects the per-student watermark + copy deterrents into an HTML document.
+// Used for both file-based (legacy) and DB-stored (uploaded) HTML.
+export function injectProtections(
+  rawHtml: string,
+  student: { fullName: string; email: string }
+): string {
+  let html = rawHtml;
 
   // Injected protections (deterrents — determined users can always screenshot;
   // the real protection is that the file is only served to authenticated,
@@ -61,4 +74,20 @@ export async function loadCourseHtml(
     html += inject;
   }
   return html;
+}
+
+// Resolves an HTML material's document from whichever source it uses:
+// DB-stored uploaded content (preferred) or a legacy file in /content.
+// Returns null if the material has neither.
+export async function renderMaterialHtml(
+  material: Pick<Material, "htmlContent" | "contentPath">,
+  student: { fullName: string; email: string }
+): Promise<string | null> {
+  if (material.htmlContent) {
+    return injectProtections(material.htmlContent, student);
+  }
+  if (material.contentPath) {
+    return loadCourseHtml(material.contentPath, student);
+  }
+  return null;
 }
