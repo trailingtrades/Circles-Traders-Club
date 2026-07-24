@@ -1,81 +1,74 @@
-# Circles Paper Trade — F&O / Options Journal (PineScript)
+# Circles Paper Trade PRO — Auto F&O / Options (PineScript)
 
-An on-chart **paper (demo) trading** indicator for the Indian F&O and options
-market, built for TradingView (Pine Script v6). It is a learning tool for the
-Circles Traders Club — **no real orders are ever placed**. You log simulated
-trades and the indicator shows a live dashboard with everything on screen.
+A self-updating **paper (demo) trading** cockpit for the Indian F&O market,
+built for TradingView (Pine Script v6). Education tool for Circles Traders Club
+— **no real orders are ever placed.**
 
 File: [`paper-trading-fno.pine`](./paper-trading-fno.pine)
 
-## What it shows
+## What makes it automatic
 
-A table on the chart with, for every trade you log:
+Whatever chart you open, the indicator:
 
-| Column | Meaning |
+- **Reads the symbol from the chart** — RELIANCE, ONGC, WIPRO, NIFTY, BANKNIFTY… switch charts and it re-reads instantly.
+- **Auto-fills the F&O lot size** from a built-in NSE lot-size table (keyed to the symbol). A manual **override** field always wins, for when NSE revises a lot or a symbol isn't listed.
+- **Shows the front-month futures price** (e.g. `NSE:RELIANCE1!`) even while you're on the cash chart, via `request.security`.
+
+## How to place a paper trade (click on chart)
+
+1. Add the indicator. TradingView will ask you to **click 4 points in order**:
+   **1) Entry level → 2) Stop-loss → 3) Target → 4) the entry candle (time).**
+2. The trade draws automatically: entry/stop/target lines, shaded risk (red) and reward (green) zones, and a P&L label.
+3. The **info panel** (top-right) then shows everything live:
+
+| Field | Meaning |
 | --- | --- |
-| **#** | Row number |
-| **Instrument** | e.g. `NIFTY 24500 CE`, `BANKNIFTY 52000 PE`, `NIFTY FUT` |
-| **Side** | LONG (buy CE/PE/Fut) or SHORT (sell CE/PE/Fut) |
-| **Qty (LxS)** | Lots × lot size = total quantity |
-| **Entry** | Your entry price |
-| **LTP/Exit** | Live price for open trades, exit price for closed trades (`*` = taken live from the chart) |
-| **Days** | Number of days the position is / was held |
-| **P&L (₹)** | Profit or loss in rupees (green = profit, red = loss), after optional charges |
-| **P&L %** | Profit or loss as a % of premium/notional entered |
-| **Status** | OPEN or CLOSED |
-| **Reason** | *Reason of mine* — your own rationale / note for the trade |
+| Side | LONG/SHORT — auto-derived (stop below entry = long, above = short) |
+| Lot size | Auto from the table (or manual) |
+| Lots × size = Qty | Total quantity |
+| Entry / LTP | Your entry and the live price |
+| Stop-loss / Target | Your levels |
+| Risk / unit, Risk amount | Points at risk, and ₹ at risk |
+| Planned R:R | Reward ÷ risk of the plan |
+| Live R-multiple | Where price is now, in units of risk |
+| P&L (live/final) | ₹ profit/loss, after optional charges |
+| P&L % | Return on premium/notional entered |
+| Days held | Auto-counted from the entry time |
+| Status | RUNNING / TARGET HIT / STOP HIT (whichever came first) |
+| Reason | Your own note for the trade |
 
-Below the trades it totals **Realised** (closed trades), **Unrealised** (open
-trades) and the **Net Total** P&L across everything.
+> **Tip:** to paper-trade the **future**, open the futures chart (e.g. `NSE:RELIANCE1!`) and click there — then Entry/Stop/Target/LTP/P&L are all on the futures series and match perfectly. On a cash chart the trade runs on cash prices, with the futures price shown as info.
 
-## How to install
+## The journal (extra trades)
 
-1. Open [TradingView](https://www.tradingview.com/) → open any chart.
-2. Bottom panel → **Pine Editor**.
-3. Paste the full contents of `paper-trading-fno.pine`.
-4. Click **Save**, then **Add to chart**.
-5. Click the indicator's ⚙ **Settings** to log your trades.
+In Settings → **Journal**, enable up to 5 more trades by typing a symbol, side,
+lots and entry. Each row auto-fills its lot size and auto-fetches its front-month
+futures price, showing live P&L. A **BOOK NET** row sums the journal plus the
+active clicked trade — your whole paper book at a glance.
 
-## How to log a paper trade
-
-Open **Settings** and fill in a **Trade** slot (there are 6 slots):
-
-- **Enable** — tick to activate the slot.
-- **Instrument** — free text, e.g. `NIFTY 24500 CE`.
-- **Side** — Buy/Long or Sell/Short (covers CE buy/sell, PE buy/sell, Futures long/short).
-- **Lots** and **Lot size** — e.g. NIFTY lot size 75, BANKNIFTY 30, FINNIFTY 40, SENSEX 20 (use the current NSE/BSE lot size). Quantity = Lots × Lot size.
-- **Entry price** and **Entry date**.
-- **Current price (0 = auto)** — for OPEN trades. Type the latest option/future price to see live P&L. If you leave it `0` and *Auto price* is on, the indicator uses the chart's last price (best when the chart is showing the exact instrument you are trading).
-- **Closed** — tick when you exit; then set **Exit price** and **Exit date**. P&L and days freeze at exit.
-- **Reason of mine** — why you took the trade.
-
-## How P&L and days are calculated
+## How the numbers are calculated
 
 ```
 quantity   = lots × lot size
-price used = exit price            (if the trade is Closed)
-             current price          (if you typed one for an open trade)
-             chart's last price     (open trade, current price = 0, Auto price ON)
-
-per unit   = (price used − entry)   for LONG
-             (entry − price used)   for SHORT
-gross P&L  = per unit × quantity
-charges    = round-trip charges per lot × lots      (optional, default 0)
-net P&L    = gross P&L − charges
-P&L %      = net P&L ÷ (entry × quantity) × 100
-days held  = (exit date or today − entry date), in whole days
+side        = Long if stop < entry, else Short   (or forced in settings)
+per unit    = (LTP − entry) for Long,  (entry − LTP) for Short
+gross P&L   = per unit × quantity
+net P&L     = gross P&L − (round-trip charges per lot × lots)
+risk/unit   = |entry − stop|      risk ₹ = risk/unit × quantity
+planned R:R = |target − entry| ÷ risk/unit
+live R      = per unit ÷ risk/unit
+days held   = (stop/target hit time, or today) − entry time, in whole days
 ```
 
-## Notes & limitations
+## Install
 
-- **Prices for open trades are manual.** TradingView cannot stream many
-  different option strikes into a single indicator, so you update the *Current
-  price* field (or use single-instrument auto mode) to refresh live P&L. This
-  is normal and expected for a paper-trading journal.
-- **Lot sizes change** — exchanges revise F&O lot sizes periodically. Always
-  enter the current lot size for the contract.
-- **P&L %** is measured against the premium/notional you entered (`entry ×
-  quantity`), not against SPAN + exposure margin, so for option-selling and
-  futures it is an indicative return, not a margin-based ROI.
-- This tool is for **education and practice only**. It is not investment advice
-  and does not connect to any broker.
+1. TradingView → open a chart → bottom panel **Pine Editor**.
+2. Delete anything in the editor, paste the full contents of `paper-trading-fno.pine`.
+3. **Save**, then **Add to chart**, and click the 4 points when prompted.
+
+## Notes & honest limits
+
+- **Lot sizes are indicative.** Exchanges revise F&O lot sizes periodically. The built-in table is a best-effort starting point — always confirm against the current NSE circular and use the override. A `⚠` shows when a symbol isn't in the table.
+- **One active clicked trade per indicator instance.** Add the indicator more than once, or use the journal, to track several at a time.
+- **No persistent, broker-style trade history.** Pine can't save a growing trade log on its own — that needs a database/login (the Circles web app can, and we can wire it up later). Within Pine, trades live in the indicator's saved settings.
+- For **education and practice only.** Not investment advice; not connected to any broker.
