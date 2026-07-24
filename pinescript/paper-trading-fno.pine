@@ -42,11 +42,14 @@ chgPerLot  = input.float(0.0, "Round-trip charges per lot (₹)", minval=0, tool
 // ----------------------------------------------------------------------------
 // Each slot has: Enable, Instrument, Side, Lots, Lot size, Entry, Current/LTP,
 // Entry date, Closed?, Exit price, Exit date, Reason.
-sideOpts = ["Buy / Long (CE buy, PE buy, Fut long)", "Sell / Short (CE sell, PE sell, Fut short)"]
+// Side labels (Pine does not allow assigning a "[...]" array literal to a variable,
+// and input.string's `options` must be an inline literal list, so we inline them below.)
+SIDE_LONG  = "Buy / Long (CE buy, PE buy, Fut long)"
+SIDE_SHORT = "Sell / Short (CE sell, PE sell, Fut short)"
 
 t1_on   = input.bool(true,  "Enable",        group="Trade 1", inline="1a")
 t1_name = input.string("NIFTY 24500 CE", "Instrument", group="Trade 1", inline="1a")
-t1_side = input.string(sideOpts[0], "Side", options=sideOpts, group="Trade 1")
+t1_side = input.string(SIDE_LONG, "Side", options=[SIDE_LONG, SIDE_SHORT], group="Trade 1")
 t1_lots = input.int(1, "Lots", minval=0, group="Trade 1", inline="1b")
 t1_size = input.int(75, "Lot size", minval=1, group="Trade 1", inline="1b")
 t1_entry= input.float(100.0, "Entry price", minval=0, group="Trade 1", inline="1c")
@@ -59,7 +62,7 @@ t1_rsn  = input.string("Breakout above resistance", "Reason of mine", group="Tra
 
 t2_on   = input.bool(false, "Enable",        group="Trade 2", inline="2a")
 t2_name = input.string("BANKNIFTY 52000 PE", "Instrument", group="Trade 2", inline="2a")
-t2_side = input.string(sideOpts[1], "Side", options=sideOpts, group="Trade 2")
+t2_side = input.string(SIDE_SHORT, "Side", options=[SIDE_LONG, SIDE_SHORT], group="Trade 2")
 t2_lots = input.int(1, "Lots", minval=0, group="Trade 2", inline="2b")
 t2_size = input.int(30, "Lot size", minval=1, group="Trade 2", inline="2b")
 t2_entry= input.float(150.0, "Entry price", minval=0, group="Trade 2", inline="2c")
@@ -72,7 +75,7 @@ t2_rsn  = input.string("Theta decay / range-bound", "Reason of mine", group="Tra
 
 t3_on   = input.bool(false, "Enable",        group="Trade 3", inline="3a")
 t3_name = input.string("NIFTY FUT", "Instrument", group="Trade 3", inline="3a")
-t3_side = input.string(sideOpts[0], "Side", options=sideOpts, group="Trade 3")
+t3_side = input.string(SIDE_LONG, "Side", options=[SIDE_LONG, SIDE_SHORT], group="Trade 3")
 t3_lots = input.int(1, "Lots", minval=0, group="Trade 3", inline="3b")
 t3_size = input.int(75, "Lot size", minval=1, group="Trade 3", inline="3b")
 t3_entry= input.float(24000.0, "Entry price", minval=0, group="Trade 3", inline="3c")
@@ -85,7 +88,7 @@ t3_rsn  = input.string("Trend continuation", "Reason of mine", group="Trade 3")
 
 t4_on   = input.bool(false, "Enable",        group="Trade 4", inline="4a")
 t4_name = input.string("FINNIFTY 23500 CE", "Instrument", group="Trade 4", inline="4a")
-t4_side = input.string(sideOpts[0], "Side", options=sideOpts, group="Trade 4")
+t4_side = input.string(SIDE_LONG, "Side", options=[SIDE_LONG, SIDE_SHORT], group="Trade 4")
 t4_lots = input.int(1, "Lots", minval=0, group="Trade 4", inline="4b")
 t4_size = input.int(40, "Lot size", minval=1, group="Trade 4", inline="4b")
 t4_entry= input.float(80.0, "Entry price", minval=0, group="Trade 4", inline="4c")
@@ -98,7 +101,7 @@ t4_rsn  = input.string("Support bounce", "Reason of mine", group="Trade 4")
 
 t5_on   = input.bool(false, "Enable",        group="Trade 5", inline="5a")
 t5_name = input.string("SENSEX 80000 PE", "Instrument", group="Trade 5", inline="5a")
-t5_side = input.string(sideOpts[1], "Side", options=sideOpts, group="Trade 5")
+t5_side = input.string(SIDE_SHORT, "Side", options=[SIDE_LONG, SIDE_SHORT], group="Trade 5")
 t5_lots = input.int(1, "Lots", minval=0, group="Trade 5", inline="5b")
 t5_size = input.int(20, "Lot size", minval=1, group="Trade 5", inline="5b")
 t5_entry= input.float(120.0, "Entry price", minval=0, group="Trade 5", inline="5c")
@@ -111,7 +114,7 @@ t5_rsn  = input.string("Hedge / directional short", "Reason of mine", group="Tra
 
 t6_on   = input.bool(false, "Enable",        group="Trade 6", inline="6a")
 t6_name = input.string("NIFTY 24000 PE", "Instrument", group="Trade 6", inline="6a")
-t6_side = input.string(sideOpts[0], "Side", options=sideOpts, group="Trade 6")
+t6_side = input.string(SIDE_LONG, "Side", options=[SIDE_LONG, SIDE_SHORT], group="Trade 6")
 t6_lots = input.int(1, "Lots", minval=0, group="Trade 6", inline="6b")
 t6_size = input.int(75, "Lot size", minval=1, group="Trade 6", inline="6b")
 t6_entry= input.float(90.0, "Entry price", minval=0, group="Trade 6", inline="6c")
