@@ -212,7 +212,9 @@ f_clean(string s) => str.upper(str.replace_all(s, " ", ""))
 // ----------------------------------------------------------------------------
 //  AUTO CONTEXT — symbol, futures price (info), lot size
 // ----------------------------------------------------------------------------
-baseSym    = f_clean(str.replace_all(str.replace_all(syminfo.ticker, "1!", ""), "!", ""))
+// On futures charts use the contract root so 1!/2!/3! all resolve cleanly
+rawSym     = syminfo.type == "futures" ? syminfo.root : syminfo.ticker
+baseSym    = f_clean(str.replace_all(str.replace_all(str.replace_all(rawSym, "1!", ""), "2!", ""), "!", ""))
 isFutChart = syminfo.type == "futures" or str.contains(syminfo.ticker, "!")
 
 futPrice   = request.security(exPrefix + ":" + baseSym + "1!", timeframe.period, close, ignore_invalid_symbol=true)
@@ -259,9 +261,10 @@ if placed and inTrade and result == "RUNNING"
 
 closed   = result != "RUNNING"
 exitPx   = result == "TARGET HIT" ? tgtP : result == "STOP HIT" ? slP : curPrice
-perUnit  = isLong ? (exitPx - entryP) : (entryP - exitPx)
+// P&L only starts once the entry time has arrived — no fictitious P&L before entry
+perUnit  = inTrade ? (isLong ? (exitPx - entryP) : (entryP - exitPx)) : 0.0
 grossPnl = perUnit * qty
-charges  = chgPerLot * lotsIn
+charges  = inTrade ? chgPerLot * lotsIn : 0.0
 netPnl   = grossPnl - charges
 riskRs   = riskUnit * qty
 pnlPct   = entryP > 0 ? netPnl / (entryP * qty) * 100 : na
@@ -316,24 +319,33 @@ f_bs(float s, float k, float t, float r, float sig, bool isCall) =>
     d2 = d1 - sig * math.sqrt(t)
     isCall ? s * f_cdf(d1) - k * math.exp(-r * t) * f_cdf(d2) : k * math.exp(-r * t) * f_cdf(-d2) - s * f_cdf(-d1)
 
-// Solve implied volatility from the live premium (Newton-Raphson)
+// Solve implied volatility from the live premium.
+// Newton-Raphson safeguarded by a bisection bracket: BS price is strictly
+// increasing in sigma, so [lo, hi] always converges even for far OTM/ITM
+// strikes where a naked Newton step diverges. Only a truly converged solve
+// is accepted — bad/stale premiums return na instead of a wrong IV.
 f_iv(float mkt, float s, float k, float t, float r, bool isCall) =>
     float ivOut = na
     if mkt > 0 and s > 0 and k > 0 and t > 0
-        float sig  = math.max(0.05, math.sqrt(2.0 * math.pi / t) * mkt / s)
+        float lo   = 0.01
+        float hi   = 5.0
+        float sig  = math.min(math.max(math.sqrt(2.0 * math.pi / t) * mkt / s, 0.05), 2.0)
         float diff = 1.0e9
         int   it   = 0
-        while it < 60 and math.abs(diff) > 0.01
+        while it < 100 and math.abs(diff) > 0.01
             price = f_bs(s, k, t, r, sig, isCall)
             d1 = (math.log(s / k) + (r + sig * sig / 2.0) * t) / (sig * math.sqrt(t))
             vega = s * f_pdf(d1) * math.sqrt(t)
             diff := price - mkt
-            if vega < 0.0001
-                break
-            sig := sig - diff / vega
-            sig := math.min(math.max(sig, 0.01), 5.0)
+            if math.abs(diff) > 0.01
+                if diff > 0
+                    hi := sig
+                else
+                    lo := sig
+                newSig = vega > 0.0001 ? sig - diff / vega : (lo + hi) / 2.0
+                sig := newSig <= lo or newSig >= hi ? (lo + hi) / 2.0 : newSig
             it += 1
-        if math.abs(diff) <= 0.5
+        if math.abs(diff) <= 0.01
             ivOut := sig
     ivOut
 
@@ -377,7 +389,7 @@ buyPE  = ta.crossunder(emaF, emaS) and rsiV < rsiBear and volOk
 bbBase = ta.sma(close, 20)
 bbDev  = 2.0 * ta.stdev(close, 20)
 kcAtr  = ta.atr(20)
-sqzOn  = (bbBase + bbDev) < (bbBase + 1.5 * kcAtr) and (bbBase - bbDev) > (bbBase - 1.5 * kcAtr)
+sqzOn  = bbDev < 1.5 * kcAtr
 sqzNew = sqzOn and not sqzOn[1]
 sqzRel = not sqzOn and sqzOn[1]
 
@@ -475,7 +487,9 @@ if barstate.islast
             bxR := box.new(entryT, math.max(entryP, slP), timenow, math.min(entryP, slP), xloc=xloc.bar_time, border_width=0, bgcolor=color.new(#ef5350, 85))
             if tgtP > 0
                 bxP := box.new(entryT, math.max(entryP, tgtP), timenow, math.min(entryP, tgtP), xloc=xloc.bar_time, border_width=0, bgcolor=color.new(#26a69a, 85))
-        lbTxt = "⭕CTC " + (isLong ? "LONG " : "SHORT ") + baseSym + "  " + f_money(netPnl) + (closed ? "  [" + result + "]" : "")
+        pnlTag = lotFound ? f_money(netPnl) : "lot size? ⚠"
+        stTag  = closed ? "  [" + result + "]" : inTrade ? "" : "  [PENDING]"
+        lbTxt  = "⭕CTC " + (isLong ? "LONG " : "SHORT ") + baseSym + "  " + pnlTag + stTag
         lbE := label.new(timenow, entryP, lbTxt, xloc=xloc.bar_time, style=label.style_label_left, color=f_pnlCol(netPnl), textcolor=color.white, size=tSize)
 
 // ----------------------------------------------------------------------------
@@ -528,11 +542,11 @@ if barstate.islast
         f_row(10, "Risk / unit", str.tostring(riskUnit, format.mintick), color.white)
         f_row(11, "Planned R:R", na(rrPlan) ? "—" : "1 : " + str.tostring(rrPlan, "#.##"), color.white)
         f_row(12, "Live R-multiple", na(curR) ? "—" : str.tostring(curR, "#.##") + "R", f_pnlCol(curR))
-        f_row(13, "Risk amount", f_money(riskRs), #ef5350)
-        f_row(14, closed ? "P&L (final)" : "P&L (live)", f_money(netPnl), f_pnlCol(netPnl))
-        f_row(15, "P&L %", na(pnlPct) ? "—" : str.tostring(pnlPct, "#.##") + "%", f_pnlCol(netPnl))
+        f_row(13, "Risk amount", lotFound ? f_money(riskRs) : "set lot override ⚠", lotFound ? #ef5350 : color.orange)
+        f_row(14, closed ? "P&L (final)" : "P&L (live)", lotFound ? f_money(netPnl) : "set lot override ⚠", lotFound ? f_pnlCol(netPnl) : color.orange)
+        f_row(15, "P&L %", na(pnlPct) ? "—" : str.tostring(pnlPct, "#.##") + "%", na(pnlPct) ? color.gray : f_pnlCol(netPnl))
         f_row(16, "Days held", str.tostring(daysHeld), color.white)
-        f_row(17, "Status", closed ? result : "RUNNING", closed ? (result == "TARGET HIT" ? #26a69a : #ef5350) : color.aqua)
+        f_row(17, "Status", closed ? result : inTrade ? "RUNNING" : "PENDING (before entry)", closed ? (result == "TARGET HIT" ? #26a69a : #ef5350) : inTrade ? color.aqua : color.yellow)
         f_row(18, "Reason", reason == "" ? "—" : reason, color.silver)
         f_hdr(19, "⭕ OPPORTUNITY SCANNER")
         f_row(20, "Buy CE (momentum)", ceTxt, ceCol)
@@ -566,8 +580,9 @@ if barstate.islast and optOn
     has1  = lg1On and not na(lg1Ltp) and lg1Ltp > 0
     has2  = lg2On and not na(lg2Ltp) and lg2Ltp > 0
 
-    ivPx1 = has1 ? lg1Ltp : lg1Entry
-    ivPx2 = has2 ? lg2Ltp : lg2Entry
+    // IV only from the LIVE premium — never from a stale entry price
+    ivPx1 = has1 ? lg1Ltp : na
+    ivPx2 = has2 ? lg2Ltp : na
     iv1   = lg1On ? f_iv(ivPx1, spotS, lg1K, tYr, rf, lg1Type == "CE") : na
     iv2   = lg2On ? f_iv(ivPx2, spotS, lg2K, tYr, rf, lg2Type == "CE") : na
 
@@ -601,7 +616,11 @@ if barstate.islast and optOn
 
     prem1 = lg1On ? (lg1Entry > 0 ? lg1Entry : has1 ? lg1Ltp : na) : na
     prem2 = lg2On ? (lg2Entry > 0 ? lg2Entry : has2 ? lg2Ltp : na) : na
-    totPr = nz(prem1) + nz(prem2)
+    // combined figures need EVERY enabled leg to have a premium — no partial sums
+    totOk  = (lg1On or lg2On) and (not lg1On or not na(prem1)) and (not lg2On or not na(prem2))
+    totPr  = totOk ? nz(prem1) + nz(prem2) : na
+    ltpOk  = (lg1On or lg2On) and (not lg1On or has1) and (not lg2On or has2)
+    ltpNet = ltpOk ? nz(lg1On ? lg1Ltp : na) + nz(lg2On ? lg2Ltp : na) : na
     be1   = not na(prem1) ? (lg1Type == "CE" ? lg1K + prem1 : lg1K - prem1) : na
     be2   = not na(prem2) ? (lg2Type == "CE" ? lg2K + prem2 : lg2K - prem2) : na
 
@@ -610,24 +629,36 @@ if barstate.islast and optOn
     strat = bothL ? (mixed ? (lg1K == lg2K ? "LONG STRADDLE" : "LONG STRANGLE") : "2x LONG " + lg1Type) : lg1On ? "LONG " + lg1Type : lg2On ? "LONG " + lg2Type : "—"
     ceK2  = lg1Type == "CE" ? lg1K : lg2K
     peK2  = lg1Type == "PE" ? lg1K : lg2K
-    beNet = mixed and totPr > 0 ? str.tostring(peK2 - totPr, format.mintick) + " / " + str.tostring(ceK2 + totPr, format.mintick) : "—"
+    beNet = mixed and not na(totPr) and totPr > 0 ? str.tostring(peK2 - totPr, format.mintick) + " / " + str.tostring(ceK2 + totPr, format.mintick) : "—"
+
+    // display strings with an explicit warning when the lot size is unknown
+    pnl1S = not lotFound ? "lot? ⚠" : na(pnl1) ? "—" : f_money(pnl1)
+    pnl2S = not lotFound ? "lot? ⚠" : na(pnl2) ? "—" : f_money(pnl2)
+    netPS = not lotFound ? "lot? ⚠" : na(netP) ? "—" : f_money(netP)
+    th1S  = not lotFound ? "lot? ⚠" : na(th1) ? "—" : f_money(th1 * oq)
+    th2S  = not lotFound ? "lot? ⚠" : na(th2) ? "—" : f_money(th2 * oq)
+    thNS  = not lotFound ? "lot? ⚠" : (na(th1) and na(th2)) ? "—" : f_money((nz(th1) + nz(th2)) * oq)
+    vg1S  = not lotFound ? "lot? ⚠" : na(vg1) ? "—" : f_money(vg1 * oq)
+    vg2S  = not lotFound ? "lot? ⚠" : na(vg2) ? "—" : f_money(vg2 * oq)
+    vgNS  = not lotFound ? "lot? ⚠" : (na(vg1) and na(vg2)) ? "—" : f_money((nz(vg1) + nz(vg2)) * oq)
+    totS  = not lotFound ? "lot? ⚠" : not na(totPr) and totPr > 0 ? f_money(totPr * oq) : "—"
 
     s1 = lg1On ? lg1Type + " " + f_kStr(lg1K) : "—"
     s2 = lg2On ? lg2Type + " " + f_kStr(lg2K) : "—"
     f_orow(1, "Contract", s1, s2, strat, color.white, color.white, color.aqua)
-    f_orow(2, "LTP (live)", lg1On ? (has1 ? str.tostring(lg1Ltp, format.mintick) : "no data ⚠") : "—", lg2On ? (has2 ? str.tostring(lg2Ltp, format.mintick) : "no data ⚠") : "—", totPr > 0 ? str.tostring(totPr, format.mintick) : "—", has1 ? color.white : color.orange, has2 ? color.white : color.orange, color.white)
+    f_orow(2, "LTP (live)", lg1On ? (has1 ? str.tostring(lg1Ltp, format.mintick) : "no data ⚠") : "—", lg2On ? (has2 ? str.tostring(lg2Ltp, format.mintick) : "no data ⚠") : "—", na(ltpNet) ? "—" : str.tostring(ltpNet, format.mintick), not lg1On ? color.gray : has1 ? color.white : color.orange, not lg2On ? color.gray : has2 ? color.white : color.orange, color.white)
     f_orow(3, "Entry premium", lg1On and lg1Entry > 0 ? str.tostring(lg1Entry, format.mintick) : "—", lg2On and lg2Entry > 0 ? str.tostring(lg2Entry, format.mintick) : "—", "", color.white, color.white, color.white)
-    f_orow(4, "P&L ₹ (" + str.tostring(optLots) + "x" + str.tostring(lotSize) + ")", na(pnl1) ? "—" : f_money(pnl1), na(pnl2) ? "—" : f_money(pnl2), na(netP) ? "—" : f_money(netP), f_pnlCol(nz(pnl1)), f_pnlCol(nz(pnl2)), f_pnlCol(nz(netP)))
+    f_orow(4, "P&L ₹ (" + str.tostring(optLots) + "x" + str.tostring(lotSize) + ")", pnl1S, pnl2S, netPS, not lotFound ? color.orange : f_pnlCol(nz(pnl1)), not lotFound ? color.orange : f_pnlCol(nz(pnl2)), not lotFound ? color.orange : f_pnlCol(nz(netP)))
     f_orow(5, "P&L %", na(pct1) ? "—" : str.tostring(pct1, "#.##") + "%", na(pct2) ? "—" : str.tostring(pct2, "#.##") + "%", "", f_pnlCol(nz(pnl1)), f_pnlCol(nz(pnl2)), color.white)
     f_orow(6, "IV %", na(iv1) ? "—" : str.tostring(iv1 * 100, "#.#") + "%", na(iv2) ? "—" : str.tostring(iv2 * 100, "#.#") + "%", "", color.yellow, color.yellow, color.white)
     f_orow(7, "Delta", na(dl1) ? "—" : str.tostring(dl1, "#.###"), na(dl2) ? "—" : str.tostring(dl2, "#.###"), (na(dl1) and na(dl2)) ? "—" : str.tostring(nz(dl1) + nz(dl2), "#.###"), color.white, color.white, color.aqua)
     f_orow(8, "Gamma", na(gm1) ? "—" : str.tostring(gm1, "#.####"), na(gm2) ? "—" : str.tostring(gm2, "#.####"), "", color.white, color.white, color.white)
-    f_orow(9, "Theta ₹/day (pos)", na(th1) ? "—" : f_money(th1 * oq), na(th2) ? "—" : f_money(th2 * oq), (na(th1) and na(th2)) ? "—" : f_money((nz(th1) + nz(th2)) * oq), #ef5350, #ef5350, #ef5350)
-    f_orow(10, "Vega ₹/1% (pos)", na(vg1) ? "—" : f_money(vg1 * oq), na(vg2) ? "—" : f_money(vg2 * oq), (na(vg1) and na(vg2)) ? "—" : f_money((nz(vg1) + nz(vg2)) * oq), color.white, color.white, color.white)
+    f_orow(9, "Theta ₹/day (pos)", th1S, th2S, thNS, #ef5350, #ef5350, #ef5350)
+    f_orow(10, "Vega ₹/1% (pos)", vg1S, vg2S, vgNS, color.white, color.white, color.white)
     f_orow(11, "Breakeven", na(be1) ? "—" : str.tostring(be1, format.mintick), na(be2) ? "—" : str.tostring(be2, format.mintick), beNet, color.white, color.white, color.aqua)
     f_orow(12, "Days to expiry", dte <= 0 ? "EXPIRED ⚠" : str.tostring(dte, "#.#"), "", "", dte <= 0 ? color.orange : color.white, color.white, color.white)
     f_orow(13, "Ticker", lg1On ? lg1Tk : "—", lg2On ? lg2Tk : "—", "", color.silver, color.silver, color.white)
-    f_orow(14, "Total premium ₹", "", "", totPr > 0 ? f_money(totPr * oq) : "—", color.white, color.white, color.yellow)
+    f_orow(14, "Total premium ₹", "", "", totS, color.white, color.white, not lotFound ? color.orange : color.yellow)
 
 // ----------------------------------------------------------------------------
 //  JOURNAL TABLE (last bar only)
@@ -654,19 +685,20 @@ if barstate.islast and showJrn
             jper  = jLong ? (jpx - jent) : (jent - jpx)
             jpnl  = has ? jper * jq : na
             jpct  = has and jent > 0 and jq > 0 ? jpnl / (jent * jq) * 100 : na
-            if has
+            okJ   = has and jls > 0
+            if okJ
                 jNet += jpnl
             jRow += 1
             bg = jRow % 2 == 0 ? color.new(color.gray, 88) : color.new(color.gray, 82)
-            table.cell(jt, 0, jRow, sym + (jls > 0 ? "" : " ⚠"), text_color=color.white, bgcolor=bg, text_size=tSize, text_halign=text.align_left)
+            table.cell(jt, 0, jRow, sym + (jls > 0 ? "" : " ⚠ lot?"), text_color=jls > 0 ? color.white : color.orange, bgcolor=bg, text_size=tSize, text_halign=text.align_left)
             table.cell(jt, 1, jRow, jLong ? "LONG" : "SHORT", text_color=jLong ? #26a69a : #ef5350, bgcolor=bg, text_size=tSize)
             table.cell(jt, 2, jRow, str.tostring(array.get(jLot, i)) + "x" + str.tostring(jls) + "=" + str.tostring(jq), text_color=color.white, bgcolor=bg, text_size=tSize)
             table.cell(jt, 3, jRow, str.tostring(jent), text_color=color.white, bgcolor=bg, text_size=tSize)
             table.cell(jt, 4, jRow, has ? str.tostring(jpx, format.mintick) : "n/a", text_color=has ? color.white : color.orange, bgcolor=bg, text_size=tSize)
-            table.cell(jt, 5, jRow, has ? f_money(jpnl) : "—", text_color=f_pnlCol(jpnl), bgcolor=bg, text_size=tSize)
-            table.cell(jt, 6, jRow, na(jpct) ? "—" : str.tostring(jpct, "#.##") + "%", text_color=f_pnlCol(jpnl), bgcolor=bg, text_size=tSize)
+            table.cell(jt, 5, jRow, okJ ? f_money(jpnl) : "—", text_color=okJ ? f_pnlCol(jpnl) : color.gray, bgcolor=bg, text_size=tSize)
+            table.cell(jt, 6, jRow, na(jpct) ? "—" : str.tostring(jpct, "#.##") + "%", text_color=na(jpct) ? color.gray : f_pnlCol(jpnl), bgcolor=bg, text_size=tSize)
 
-    bookNet = jNet + (placed ? netPnl : 0.0)
+    bookNet = jNet + (placed and inTrade and lotFound ? netPnl : 0.0)
     tr = jRow + 1
     table.cell(jt, 0, tr, "BOOK NET (incl. active)", text_color=color.white, bgcolor=color.new(color.black, 0), text_size=tSize, text_halign=text.align_left)
     table.cell(jt, 1, tr, "", bgcolor=color.new(color.black, 0), text_size=tSize)
