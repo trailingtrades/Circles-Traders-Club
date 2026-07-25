@@ -1,74 +1,73 @@
-# Circles Paper Trade PRO — Auto F&O / Options (PineScript)
+# ⭕ CTC Paper Trade PRO — Option-Buying Ecosystem (PineScript)
 
-A self-updating **paper (demo) trading** cockpit for the Indian F&O market,
-built for TradingView (Pine Script v6). Education tool for Circles Traders Club
-— **no real orders are ever placed.**
+A self-updating **paper (demo) trading** cockpit for Indian F&O, built for
+TradingView (Pine Script v6), focused on **option buying** — CE buying, PE
+buying, long straddle and long strangle. Education tool for Circles Traders
+Club — **no real orders are ever placed.**
 
 File: [`paper-trading-fno.pine`](./paper-trading-fno.pine)
 
-## What makes it automatic
+## Project phases
 
-Whatever chart you open, the indicator:
+| Phase | What | Status |
+| --- | --- | --- |
+| 1 | Manual paper journal (P&L, days, reason) | ✅ Done |
+| 2 | Auto engine — chart-following symbol, auto lot size, futures price, click-to-trade, R:R, journal book | ✅ Done |
+| 3 | **Option Engine** — live premiums by expiry+strike (no manual updates), IV from live premium, Delta/Gamma/Theta/Vega, breakevens, straddle/strangle | ✅ Done |
+| 4 | **Opportunity Scanner** — BUY CE / BUY PE momentum signals, squeeze → straddle window, TradingView alerts | ✅ Done |
+| 5 | Branding — ⭕ CTC logo in panel, labels, tables | ✅ Done |
+| 6 | (Optional, future) Web-app integration: persistent student trade history, leaderboards | ⏳ Pending |
 
-- **Reads the symbol from the chart** — RELIANCE, ONGC, WIPRO, NIFTY, BANKNIFTY… switch charts and it re-reads instantly.
-- **Auto-fills the F&O lot size** from a built-in NSE lot-size table (keyed to the symbol). A manual **override** field always wins, for when NSE revises a lot or a symbol isn't listed.
-- **Shows the front-month futures price** (e.g. `NSE:RELIANCE1!`) even while you're on the cash chart, via `request.security`.
+## How live prices work (no manual updating)
 
-## How to place a paper trade (click on chart)
+1. **Futures** — auto-fetched for the chart's symbol (`NSE:RELIANCE1!` etc.) and for every journal row. Nothing to type.
+2. **Options** — turn on the **⭕ Option engine**, pick the **expiry date**, **strike** and **CE/PE**. The script builds the real TradingView contract symbol (e.g. `NSE:NIFTY260827C24500`) and streams its premium live via `request.security`. No manual price entry, ever.
+3. If TradingView shows *delayed* NSE data on your plan, the same delay applies here. Enable NSE real-time data in your TradingView profile for true live prices.
+4. If the Option Engine shows `no data ⚠` — the exact contract (that expiry/strike combo) isn't listed on TradingView; double-check the expiry date and strike.
 
-1. Add the indicator. TradingView will ask you to **click 4 points in order**:
-   **1) Entry level → 2) Stop-loss → 3) Target → 4) the entry candle (time).**
-2. The trade draws automatically: entry/stop/target lines, shaded risk (red) and reward (green) zones, and a P&L label.
-3. The **info panel** (top-right) then shows everything live:
+## Option Engine (Phase 3)
 
-| Field | Meaning |
-| --- | --- |
-| Side | LONG/SHORT — auto-derived (stop below entry = long, above = short) |
-| Lot size | Auto from the table (or manual) |
-| Lots × size = Qty | Total quantity |
-| Entry / LTP | Your entry and the live price |
-| Stop-loss / Target | Your levels |
-| Risk / unit, Risk amount | Points at risk, and ₹ at risk |
-| Planned R:R | Reward ÷ risk of the plan |
-| Live R-multiple | Where price is now, in units of risk |
-| P&L (live/final) | ₹ profit/loss, after optional charges |
-| P&L % | Return on premium/notional entered |
-| Days held | Auto-counted from the entry time |
-| Status | RUNNING / TARGET HIT / STOP HIT (whichever came first) |
-| Reason | Your own note for the trade |
+Two legs. Use Leg 1 alone for plain CE/PE buying; enable Leg 2 with the
+opposite type for a **long straddle** (same strike) or **strangle** (different
+strikes). For each leg and for the NET position it shows:
 
-> **Tip:** to paper-trade the **future**, open the futures chart (e.g. `NSE:RELIANCE1!`) and click there — then Entry/Stop/Target/LTP/P&L are all on the futures series and match perfectly. On a cash chart the trade runs on cash prices, with the futures price shown as info.
+- LTP (live premium), entry premium, **P&L ₹ and %**
+- **IV** — solved from the live premium via Newton-Raphson on Black-Scholes
+- **Delta, Gamma, Theta (₹/day for your position), Vega (₹ per 1% IV)**
+- **Breakevens** — per leg, and the combined lower/upper for straddle/strangle
+- Days to expiry, total premium at risk, detected strategy name
 
-## The journal (extra trades)
+Greeks use the chart's underlying price, the expiry you set, and a
+configurable risk-free rate (default 6.5%).
 
-In Settings → **Journal**, enable up to 5 more trades by typing a symbol, side,
-lots and entry. Each row auto-fills its lot size and auto-fetches its front-month
-futures price, showing live P&L. A **BOOK NET** row sums the journal plus the
-active clicked trade — your whole paper book at a glance.
+## Opportunity Scanner (Phase 4) — "never miss a move"
 
-## How the numbers are calculated
+- **BUY CE** — fast EMA crosses above slow EMA + RSI strong + volume surge
+- **BUY PE** — the bearish mirror
+- **STRADDLE window** — Bollinger-inside-Keltner volatility squeeze: while the
+  squeeze is ON a big move is loading (get the straddle ready); when it
+  RELEASES the window opens
+- Signals are marked on the chart, shown in the panel, and exposed as
+  **alert conditions** — right-click the chart → *Add alert* → choose this
+  indicator's conditions once, and TradingView watches the live market for
+  you even when the chart is closed.
 
-```
-quantity   = lots × lot size
-side        = Long if stop < entry, else Short   (or forced in settings)
-per unit    = (LTP − entry) for Long,  (entry − LTP) for Short
-gross P&L   = per unit × quantity
-net P&L     = gross P&L − (round-trip charges per lot × lots)
-risk/unit   = |entry − stop|      risk ₹ = risk/unit × quantity
-planned R:R = |target − entry| ÷ risk/unit
-live R      = per unit ÷ risk/unit
-days held   = (stop/target hit time, or today) − entry time, in whole days
-```
+## Click-to-trade + journal (Phases 1–2)
+
+Unchanged: click Entry → Stop → Target → entry time to place the active paper
+trade (auto side, auto lot size, R:R, live R-multiple, days held, reason,
+risk/reward zones). The journal tracks 5 more typed trades with auto lot size
+and auto futures prices, plus a BOOK NET total.
 
 ## Install
 
-1. TradingView → open a chart → bottom panel **Pine Editor**.
-2. Delete anything in the editor, paste the full contents of `paper-trading-fno.pine`.
-3. **Save**, then **Add to chart**, and click the 4 points when prompted.
+1. TradingView → open a chart → **Pine Editor** (bottom panel).
+2. Delete everything there, paste the full contents of `paper-trading-fno.pine`.
+3. **Save** → **Add to chart** → click the 4 points when prompted.
 
-## Notes & honest limits
+## Honest limits
 
-- **Lot sizes are indicative.** Exchanges revise F&O lot sizes periodically. The built-in table is a best-effort starting point — always confirm against the current NSE circular and use the override. A `⚠` shows when a symbol isn't in the table.
-- **One active clicked trade per indicator instance.** Add the indicator more than once, or use the journal, to track several at a time.
-- **No persistent, broker-style trade history.** Pine can't save a growing trade log on its own — that needs a database/login (the Circles web app can, and we can wire it up later). Within Pine, trades live in the indicator's saved settings.
-- For **education and practice only.** Not investment advice; not connected to any broker.
+- **Lot sizes are indicative** — NSE revises them; confirm against the current circular and use the override field (⚠ shows for unknown symbols).
+- **A logo image cannot be embedded** — Pine only renders text/emoji, so the ⭕ CTC mark is used. (Your TradingView profile picture is what shows as the publisher logo if you publish the script.)
+- **IV/Greeks are model values** (Black-Scholes, European-style) — good for learning and comparison; they can differ slightly from broker-shown Greeks.
+- Signals are educational starting points, not tips. **Not investment advice; not connected to any broker.**
