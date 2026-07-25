@@ -88,13 +88,16 @@ exPrefix  = input.string("NSE", "Exchange prefix", options=["NSE","BSE","MCX"], 
 chgPerLot = input.float(0.0, "Round-trip charges per lot (₹)", minval=0, group=g_src)
 
 // ----------------------------------------------------------------------------
-//  BUILT-IN F&O LOT-SIZE TABLE  (indicative — verify vs current NSE circular)
+//  BUILT-IN F&O LOT-SIZE TABLE
+//  Index lots follow the NSE Jan-2026 revision (NIFTY 75→65, BANKNIFTY 35→30,
+//  FINNIFTY 65→60, MIDCPNIFTY 140→120), cross-checked Jul 2026. Stock lots are
+//  indicative — NSE revises them; the override input always wins.
 // ----------------------------------------------------------------------------
 f_lot(string s) =>
     switch s
-        "NIFTY"        => 75
+        "NIFTY"        => 65
         "BANKNIFTY"    => 30
-        "FINNIFTY"     => 65
+        "FINNIFTY"     => 60
         "MIDCPNIFTY"   => 120
         "NIFTYNXT50"   => 25
         "SENSEX"       => 20
@@ -102,7 +105,7 @@ f_lot(string s) =>
         "RELIANCE"     => 500
         "TCS"          => 175
         "INFY"         => 400
-        "HDFCBANK"     => 550
+        "HDFCBANK"     => 650
         "ICICIBANK"    => 700
         "SBIN"         => 750
         "AXISBANK"     => 625

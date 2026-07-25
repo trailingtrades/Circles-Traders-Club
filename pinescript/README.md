@@ -67,7 +67,7 @@ and auto futures prices, plus a BOOK NET total.
 
 ## Honest limits
 
-- **Lot sizes are indicative** — NSE revises them; confirm against the current circular and use the override field (⚠ shows for unknown symbols).
+- **Lot sizes:** index lots follow the NSE January-2026 revision (NIFTY 65, BANKNIFTY 30, FINNIFTY 60, MIDCPNIFTY 120, NIFTYNXT50 25; SENSEX 20 on BSE), cross-checked in July 2026. Stock lots are indicative — NSE revises them quarterly; confirm against the current circular and use the override field (⚠ shows for unknown symbols).
 - **A logo image cannot be embedded** — Pine only renders text/emoji, so the ⭕ CTC mark is used. (Your TradingView profile picture is what shows as the publisher logo if you publish the script.)
 - **IV/Greeks are model values** (Black-Scholes, European-style) — good for learning and comparison; they can differ slightly from broker-shown Greeks.
 - Signals are educational starting points, not tips. **Not investment advice; not connected to any broker.**
