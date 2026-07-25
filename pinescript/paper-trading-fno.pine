@@ -1,0 +1,712 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Circles Traders Club
+//
+// ============================================================================
+//  ⭕ CTC PAPER TRADE PRO — Option-Buying Ecosystem for Indian F&O
+// ============================================================================
+//  PHASES
+//   1 ✅ Manual paper journal (P&L, days, reason)
+//   2 ✅ Auto engine — chart-following symbol, auto lot size, futures price,
+//        click-to-trade (Entry/Stop/Target), R:R, days held, journal book
+//   3 ✅ OPTION ENGINE — live option premiums fetched from TradingView by
+//        expiry+strike+CE/PE (no manual price updates), IV solved from the
+//        live premium (Newton-Raphson on Black-Scholes), Delta/Gamma/Theta/
+//        Vega, breakevens, single-leg CE/PE buying + LONG STRADDLE/STRANGLE
+//   4 ✅ OPPORTUNITY SCANNER — buy-side signals (BUY CE momentum, BUY PE
+//        momentum, volatility-squeeze STRADDLE window) + TradingView alerts
+//        so no live-market opportunity is missed
+//   5 ✅ Branding — ⭕ CTC logo in panel, labels and tables
+//
+//  PAPER ONLY — no real orders. Lot sizes indicative (override available).
+//  Option premiums come live from TradingView's NSE option contracts; if your
+//  TradingView plan shows delayed NSE data, prices will be delayed the same.
+// ============================================================================
+
+//@version=6
+indicator("⭕ CTC Paper Trade PRO — Option Buying", shorttitle="⭕ CTC PRO", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+// ----------------------------------------------------------------------------
+//  DISPLAY
+// ----------------------------------------------------------------------------
+g_ui      = "Display"
+panelPos  = input.string("Top Right",   "Info panel position",   options=["Top Right","Top Left","Middle Right","Middle Left"], group=g_ui)
+optPos    = input.string("Top Left",    "Option engine position", options=["Top Left","Top Right","Middle Left","Middle Right","Bottom Left"], group=g_ui)
+jrnPos    = input.string("Bottom Right", "Journal position",      options=["Bottom Right","Bottom Left","Middle Right","Middle Left"], group=g_ui)
+txtSize   = input.string("Normal", "Text size", options=["Tiny","Small","Normal","Large"], group=g_ui)
+showZones = input.bool(true, "Shade risk / reward zones on chart", group=g_ui)
+showJrn   = input.bool(true, "Show the extra-trades journal table", group=g_ui)
+showSig   = input.bool(true, "Show signal marks on chart", group=g_ui)
+
+// ----------------------------------------------------------------------------
+//  ACTIVE TRADE — click the chart to place (or type the numbers here)
+// ----------------------------------------------------------------------------
+g_tr      = "Active trade (click on chart in this order)"
+entryP    = input.price(0.0, "1) Entry level  (click)",  confirm=true, group=g_tr)
+slP       = input.price(0.0, "2) Stop-loss    (click)",  confirm=true, group=g_tr)
+tgtP      = input.price(0.0, "3) Target       (click)",  confirm=true, group=g_tr)
+entryT    = input.time(timestamp("2026-01-01T09:15:00"), "4) Entry time (click)", confirm=true, group=g_tr)
+sideOv    = input.string("Auto", "Side", options=["Auto","Long","Short"], tooltip="Auto = Long if the stop is below entry, Short if the stop is above entry.", group=g_tr)
+lotsIn    = input.int(1, "Number of lots", minval=1, group=g_tr)
+lotOv     = input.int(0, "Lot size override (0 = auto)", minval=0, tooltip="Leave 0 to auto-fill from the built-in NSE F&O table. Set a value to override when NSE revises the lot or the symbol is not in the table.", group=g_tr)
+reason    = input.string("", "Reason / notes for this trade", group=g_tr)
+
+// ----------------------------------------------------------------------------
+//  OPTION ENGINE — live premiums by expiry + strike (buy-side focus)
+// ----------------------------------------------------------------------------
+g_op      = "⭕ Option engine (CE/PE buying, straddle, strangle)"
+optOn     = input.bool(false, "Enable option engine", group=g_op)
+optExp    = input.time(timestamp("2026-08-27T15:30:00"), "Expiry date", tooltip="Pick the exact listed expiry date of the contract.", group=g_op)
+optLots   = input.int(1, "Lots (options)", minval=1, group=g_op)
+rf        = input.float(6.5, "Risk-free rate %", minval=0, step=0.25, group=g_op) / 100.0
+lg1On     = input.bool(true, "Leg 1 on", group=g_op, inline="L1")
+lg1Type   = input.string("CE", "", options=["CE","PE"], group=g_op, inline="L1")
+lg1K      = input.float(24500.0, "Strike", minval=0.05, group=g_op, inline="L1")
+lg1Entry  = input.float(0.0, "Entry prem (0=watch)", minval=0, group=g_op, inline="L1")
+lg2On     = input.bool(false, "Leg 2 on", group=g_op, inline="L2")
+lg2Type   = input.string("PE", "", options=["CE","PE"], group=g_op, inline="L2")
+lg2K      = input.float(24500.0, "Strike", minval=0.05, group=g_op, inline="L2")
+lg2Entry  = input.float(0.0, "Entry prem (0=watch)", minval=0, group=g_op, inline="L2")
+
+// ----------------------------------------------------------------------------
+//  OPPORTUNITY SCANNER — buy-side only (CE / PE / straddle window)
+// ----------------------------------------------------------------------------
+g_sc      = "Opportunity scanner"
+emaFastL  = input.int(9,  "Fast EMA", minval=2, group=g_sc)
+emaSlowL  = input.int(21, "Slow EMA", minval=3, group=g_sc)
+rsiL      = input.int(14, "RSI length", minval=2, group=g_sc)
+rsiBull   = input.int(55, "RSI bull level", minval=50, maxval=80, group=g_sc)
+rsiBear   = input.int(45, "RSI bear level", minval=20, maxval=50, group=g_sc)
+volMult   = input.float(1.5, "Volume surge x avg", minval=0.5, step=0.1, group=g_sc)
+sigLook   = input.int(5, "Show signals from last N bars", minval=1, maxval=50, group=g_sc)
+
+// ----------------------------------------------------------------------------
+//  DATA SOURCE
+// ----------------------------------------------------------------------------
+g_src     = "Data source"
+useFut    = input.bool(true, "Fetch front-month FUTURES price for info/journal", group=g_src)
+exPrefix  = input.string("NSE", "Exchange prefix", options=["NSE","BSE","MCX"], group=g_src)
+chgPerLot = input.float(0.0, "Round-trip charges per lot (₹)", minval=0, group=g_src)
+
+// ----------------------------------------------------------------------------
+//  BUILT-IN F&O LOT-SIZE TABLE
+//  Index lots follow the NSE Jan-2026 revision (NIFTY 75→65, BANKNIFTY 35→30,
+//  FINNIFTY 65→60, MIDCPNIFTY 140→120), cross-checked Jul 2026. Stock lots are
+//  indicative — NSE revises them; the override input always wins.
+// ----------------------------------------------------------------------------
+f_lot(string s) =>
+    switch s
+        "NIFTY"        => 65
+        "BANKNIFTY"    => 30
+        "FINNIFTY"     => 60
+        "MIDCPNIFTY"   => 120
+        "NIFTYNXT50"   => 25
+        "SENSEX"       => 20
+        "BANKEX"       => 30
+        "RELIANCE"     => 500
+        "TCS"          => 175
+        "INFY"         => 400
+        "HDFCBANK"     => 650
+        "ICICIBANK"    => 700
+        "SBIN"         => 750
+        "AXISBANK"     => 625
+        "KOTAKBANK"    => 400
+        "HINDUNILVR"   => 300
+        "ITC"          => 1600
+        "LT"           => 175
+        "BHARTIARTL"   => 475
+        "BAJFINANCE"   => 750
+        "BAJAJFINSV"   => 500
+        "MARUTI"       => 50
+        "M_M"          => 350
+        "TATAMOTORS"   => 800
+        "TATASTEEL"    => 5500
+        "TATAPOWER"    => 1450
+        "TATACONSUM"   => 550
+        "ONGC"         => 3850
+        "COALINDIA"    => 2100
+        "NTPC"         => 1500
+        "POWERGRID"    => 3600
+        "IOC"          => 4875
+        "BPCL"         => 1975
+        "GAIL"         => 3150
+        "WIPRO"        => 3000
+        "HCLTECH"      => 350
+        "TECHM"        => 600
+        "LTIM"         => 150
+        "SUNPHARMA"    => 350
+        "DRREDDY"      => 625
+        "CIPLA"        => 375
+        "DIVISLAB"     => 100
+        "APOLLOHOSP"   => 125
+        "TITAN"        => 175
+        "ASIANPAINT"   => 200
+        "NESTLEIND"    => 250
+        "ULTRACEMCO"   => 50
+        "GRASIM"       => 250
+        "JSWSTEEL"     => 675
+        "HINDALCO"     => 1400
+        "VEDL"         => 1150
+        "ADANIENT"     => 300
+        "ADANIPORTS"   => 400
+        "DLF"          => 825
+        "HDFCLIFE"     => 1100
+        "SBILIFE"      => 375
+        "ICICIPRULI"   => 925
+        "BAJAJ_AUTO"   => 75
+        "EICHERMOT"    => 175
+        "HEROMOTOCO"   => 150
+        "TVSMOTOR"     => 350
+        "ZOMATO"       => 2425
+        "PAYTM"        => 725
+        "IRCTC"        => 875
+        "PNB"          => 8000
+        "BANKBARODA"   => 2925
+        "CANBK"        => 6750
+        "IDFCFIRSTB"   => 7100
+        "INDUSINDBK"   => 500
+        "AMBUJACEM"    => 900
+        "SHREECEM"     => 25
+        "PIDILITIND"   => 250
+        "DABUR"        => 1250
+        "BRITANNIA"    => 200
+        "GODREJCP"     => 500
+        "MARICO"       => 1200
+        "COLPAL"       => 175
+        "BERGEPAINT"   => 1650
+        "SIEMENS"      => 75
+        "BEL"          => 2850
+        "HAL"          => 150
+        "BHEL"         => 2625
+        "SAIL"         => 4700
+        "NMDC"         => 13500
+        "JINDALSTEL"   => 625
+        "ADANIGREEN"   => 300
+        "ADANIPOWER"   => 1000
+        "PFC"          => 1300
+        "RECLTD"       => 1200
+        "LICI"         => 700
+        "TRENT"        => 100
+        "NAUKRI"       => 125
+        "PERSISTENT"   => 100
+        "COFORGE"      => 90
+        "MPHASIS"      => 275
+        "POLYCAB"      => 100
+        "HAVELLS"      => 500
+        "CGPOWER"      => 850
+        "DIXON"        => 50
+        "LUPIN"        => 425
+        "AUROPHARMA"   => 550
+        "BIOCON"       => 2500
+        "TORNTPHARM"   => 250
+        "GLENMARK"     => 575
+        "ALKEM"        => 125
+        "CHOLAFIN"     => 625
+        "MUTHOOTFIN"   => 275
+        "SBICARD"      => 800
+        "HDFCAMC"      => 150
+        "IGL"          => 1375
+        "PETRONET"     => 3000
+        "OIL"          => 1400
+        "MGL"          => 400
+        => 0
+
+f_clean(string s) => str.upper(str.replace_all(s, " ", ""))
+
+// ----------------------------------------------------------------------------
+//  AUTO CONTEXT — symbol, futures price (info), lot size
+// ----------------------------------------------------------------------------
+// On futures charts use the contract root so 1!/2!/3! all resolve cleanly
+rawSym     = syminfo.type == "futures" ? syminfo.root : syminfo.ticker
+baseSym    = f_clean(str.replace_all(str.replace_all(str.replace_all(rawSym, "1!", ""), "2!", ""), "!", ""))
+isFutChart = syminfo.type == "futures" or str.contains(syminfo.ticker, "!")
+
+futPrice   = request.security(exPrefix + ":" + baseSym + "1!", timeframe.period, close, ignore_invalid_symbol=true)
+futInfo    = (useFut and not isFutChart and not na(futPrice)) ? futPrice : na
+chartTag   = isFutChart ? "futures" : "cash"
+
+// The active clicked trade always uses the chart you clicked on, so levels
+// and P&L stay on the same price series (no cash-vs-futures mismatch).
+curPrice   = close
+
+lotAuto    = f_lot(baseSym)
+lotSize    = lotOv > 0 ? lotOv : lotAuto
+lotFound   = lotSize > 0
+
+// ----------------------------------------------------------------------------
+//  ACTIVE TRADE MATH
+// ----------------------------------------------------------------------------
+placed   = entryP > 0 and slP > 0
+isLong   = sideOv == "Long" ? true : sideOv == "Short" ? false : (slP < entryP)
+qty      = lotSize * lotsIn
+
+riskUnit = math.abs(entryP - slP)
+rewUnit  = tgtP > 0 ? math.abs(tgtP - entryP) : na
+rrPlan   = (not na(rewUnit) and riskUnit > 0) ? rewUnit / riskUnit : na
+
+inTrade  = placed and time >= entryT
+var string result  = "RUNNING"
+var int    hitTime = na
+if placed and inTrade and result == "RUNNING"
+    if isLong
+        if low <= slP
+            result := "STOP HIT"
+            hitTime := time
+        else if tgtP > 0 and high >= tgtP
+            result := "TARGET HIT"
+            hitTime := time
+    else
+        if high >= slP
+            result := "STOP HIT"
+            hitTime := time
+        else if tgtP > 0 and low <= tgtP
+            result := "TARGET HIT"
+            hitTime := time
+
+closed   = result != "RUNNING"
+exitPx   = result == "TARGET HIT" ? tgtP : result == "STOP HIT" ? slP : curPrice
+// P&L only starts once the entry time has arrived — no fictitious P&L before entry
+perUnit  = inTrade ? (isLong ? (exitPx - entryP) : (entryP - exitPx)) : 0.0
+grossPnl = perUnit * qty
+charges  = inTrade ? chgPerLot * lotsIn : 0.0
+netPnl   = grossPnl - charges
+riskRs   = riskUnit * qty
+pnlPct   = entryP > 0 ? netPnl / (entryP * qty) * 100 : na
+curR     = riskUnit > 0 ? perUnit / riskUnit : na
+
+endTs    = closed and not na(hitTime) ? hitTime : timenow
+daysHeld = placed ? int(math.max(0, math.floor((endTs - entryT) / 86400000))) : 0
+
+// ----------------------------------------------------------------------------
+//  GENERAL HELPERS
+// ----------------------------------------------------------------------------
+f_pos(string p) => p == "Top Right" ? position.top_right : p == "Top Left" ? position.top_left : p == "Bottom Right" ? position.bottom_right : p == "Bottom Left" ? position.bottom_left : p == "Middle Left" ? position.middle_left : position.middle_right
+tSize = txtSize == "Tiny" ? size.tiny : txtSize == "Small" ? size.small : txtSize == "Large" ? size.large : size.normal
+
+f_grp(int n) =>
+    s = str.tostring(math.abs(n))
+    out = ""
+    cnt = 0
+    for i = str.length(s) - 1 to 0
+        out := str.substring(s, i, i + 1) + out
+        cnt += 1
+        if cnt % 3 == 0 and i != 0
+            out := "," + out
+    out
+
+f_money(float v) =>
+    sign = v < 0 ? "-" : ""
+    av   = math.abs(v)
+    w    = math.floor(av)
+    fr   = math.round((av - w) * 100)
+    frF  = fr == 100 ? 0 : fr
+    wA   = fr == 100 ? w + 1 : w
+    frS  = (frF < 10 ? "0" : "") + str.tostring(frF)
+    sign + "₹" + f_grp(int(wA)) + "." + frS
+
+f_pnlCol(float v) => v > 0 ? #26a69a : v < 0 ? #ef5350 : color.gray
+
+// ----------------------------------------------------------------------------
+//  BLACK-SCHOLES MATH  (for IV + Greeks of the option legs)
+// ----------------------------------------------------------------------------
+f_pdf(float x) =>
+    math.exp(-x * x / 2.0) / math.sqrt(2.0 * math.pi)
+
+f_cdf(float x) =>
+    k = 1.0 / (1.0 + 0.2316419 * math.abs(x))
+    poly = k * (0.319381530 + k * (-0.356563782 + k * (1.781477937 + k * (-1.821255978 + k * 1.330274429))))
+    w = 1.0 - f_pdf(x) * poly
+    x < 0 ? 1.0 - w : w
+
+f_bs(float s, float k, float t, float r, float sig, bool isCall) =>
+    d1 = (math.log(s / k) + (r + sig * sig / 2.0) * t) / (sig * math.sqrt(t))
+    d2 = d1 - sig * math.sqrt(t)
+    isCall ? s * f_cdf(d1) - k * math.exp(-r * t) * f_cdf(d2) : k * math.exp(-r * t) * f_cdf(-d2) - s * f_cdf(-d1)
+
+// Solve implied volatility from the live premium.
+// Newton-Raphson safeguarded by a bisection bracket: BS price is strictly
+// increasing in sigma, so [lo, hi] always converges even for far OTM/ITM
+// strikes where a naked Newton step diverges. Only a truly converged solve
+// is accepted — bad/stale premiums return na instead of a wrong IV.
+f_iv(float mkt, float s, float k, float t, float r, bool isCall) =>
+    float ivOut = na
+    if mkt > 0 and s > 0 and k > 0 and t > 0
+        float lo   = 0.01
+        float hi   = 5.0
+        float sig  = math.min(math.max(math.sqrt(2.0 * math.pi / t) * mkt / s, 0.05), 2.0)
+        float diff = 1.0e9
+        int   it   = 0
+        while it < 100 and math.abs(diff) > 0.01
+            price = f_bs(s, k, t, r, sig, isCall)
+            d1 = (math.log(s / k) + (r + sig * sig / 2.0) * t) / (sig * math.sqrt(t))
+            vega = s * f_pdf(d1) * math.sqrt(t)
+            diff := price - mkt
+            if math.abs(diff) > 0.01
+                if diff > 0
+                    hi := sig
+                else
+                    lo := sig
+                newSig = vega > 0.0001 ? sig - diff / vega : (lo + hi) / 2.0
+                sig := newSig <= lo or newSig >= hi ? (lo + hi) / 2.0 : newSig
+            it += 1
+        if math.abs(diff) <= 0.01
+            ivOut := sig
+    ivOut
+
+f_greeks(float s, float k, float t, float r, float sig, bool isCall) =>
+    d1 = (math.log(s / k) + (r + sig * sig / 2.0) * t) / (sig * math.sqrt(t))
+    d2 = d1 - sig * math.sqrt(t)
+    delta = isCall ? f_cdf(d1) : f_cdf(d1) - 1.0
+    gamma = f_pdf(d1) / (s * sig * math.sqrt(t))
+    vega1 = s * f_pdf(d1) * math.sqrt(t) / 100.0
+    decay = -(s * f_pdf(d1) * sig) / (2.0 * math.sqrt(t))
+    thYr  = isCall ? decay - r * k * math.exp(-r * t) * f_cdf(d2) : decay + r * k * math.exp(-r * t) * f_cdf(-d2)
+    [delta, gamma, thYr / 365.0, vega1]
+
+// ----------------------------------------------------------------------------
+//  OPTION TICKERS — built from expiry + strike, premiums fetched LIVE
+//  Format: NSE:SYMBOL + YYMMDD + C/P + STRIKE   (e.g. NSE:NIFTY260827C24500)
+// ----------------------------------------------------------------------------
+f_expStr(int t) =>
+    str.tostring(year(t) % 100, "00") + str.tostring(month(t), "00") + str.tostring(dayofmonth(t), "00")
+
+f_kStr(float k) => str.tostring(k, "#.##")
+
+lg1Tk  = exPrefix + ":" + baseSym + f_expStr(optExp) + (lg1Type == "CE" ? "C" : "P") + f_kStr(lg1K)
+lg2Tk  = exPrefix + ":" + baseSym + f_expStr(optExp) + (lg2Type == "CE" ? "C" : "P") + f_kStr(lg2K)
+lg1Ltp = request.security(lg1Tk, timeframe.period, close, ignore_invalid_symbol=true)
+lg2Ltp = request.security(lg2Tk, timeframe.period, close, ignore_invalid_symbol=true)
+
+// ----------------------------------------------------------------------------
+//  OPPORTUNITY SCANNER  (buy-side: BUY CE, BUY PE, STRADDLE window)
+// ----------------------------------------------------------------------------
+emaF   = ta.ema(close, emaFastL)
+emaS   = ta.ema(close, emaSlowL)
+rsiV   = ta.rsi(close, rsiL)
+volAvg = ta.sma(volume, 20)
+volOk  = na(volAvg) or volAvg <= 0 ? true : volume > volMult * volAvg
+
+buyCE  = ta.crossover(emaF, emaS) and rsiV > rsiBull and volOk
+buyPE  = ta.crossunder(emaF, emaS) and rsiV < rsiBear and volOk
+
+// TTM-style volatility squeeze → big move expected → LONG STRADDLE/STRANGLE
+bbBase = ta.sma(close, 20)
+bbDev  = 2.0 * ta.stdev(close, 20)
+kcAtr  = ta.atr(20)
+sqzOn  = bbDev < 1.5 * kcAtr
+sqzNew = sqzOn and not sqzOn[1]
+sqzRel = not sqzOn and sqzOn[1]
+
+ceAgo  = ta.barssince(buyCE)
+peAgo  = ta.barssince(buyPE)
+relAgo = ta.barssince(sqzRel)
+
+plotshape(showSig and buyCE,  "Buy CE",   style=shape.labelup,   location=location.belowbar, color=color.new(#26a69a, 0), text="CE 🔥", textcolor=color.white, size=size.small)
+plotshape(showSig and buyPE,  "Buy PE",   style=shape.labeldown, location=location.abovebar, color=color.new(#ef5350, 0), text="PE 🔥", textcolor=color.white, size=size.small)
+plotshape(showSig and sqzRel, "Straddle", style=shape.diamond,   location=location.abovebar, color=color.new(color.orange, 0), text="⚡STRD", textcolor=color.orange, size=size.tiny)
+
+// Alerts — create these once (right-click chart → Add alert → this indicator)
+// and TradingView watches the live market for you 24x7. No opportunity missed.
+alertcondition(buyCE,  "⭕ CTC: BUY CE opportunity",   "CTC: Bullish momentum on {{ticker}} — CE buying opportunity. Check the chart.")
+alertcondition(buyPE,  "⭕ CTC: BUY PE opportunity",   "CTC: Bearish momentum on {{ticker}} — PE buying opportunity. Check the chart.")
+alertcondition(sqzNew, "⭕ CTC: Squeeze building",     "CTC: Volatility squeeze building on {{ticker}} — straddle/strangle ready rakho.")
+alertcondition(sqzRel, "⭕ CTC: STRADDLE window open", "CTC: Squeeze released on {{ticker}} — big move likely, LONG STRADDLE/STRANGLE window.")
+alertcondition(closed and not closed[1], "⭕ CTC: Active trade closed", "CTC: Aapka active paper trade close ho gaya (stop ya target hit) on {{ticker}}.")
+
+// ----------------------------------------------------------------------------
+//  JOURNAL — extra typed trades across symbols (auto lot size + futures price)
+// ----------------------------------------------------------------------------
+g_j  = "Journal — extra trades (type the symbol)"
+j1on = input.bool(false, "Enable", group=g_j, inline="j1")
+j1s  = input.string("",  "Symbol", group=g_j, inline="j1")
+j1d  = input.string("Long", "", options=["Long","Short"], group=g_j, inline="j1")
+j1l  = input.int(1, "Lots", minval=1, group=g_j, inline="j1")
+j1e  = input.float(0.0, "Entry", group=g_j, inline="j1")
+
+j2on = input.bool(false, "Enable", group=g_j, inline="j2")
+j2s  = input.string("",  "Symbol", group=g_j, inline="j2")
+j2d  = input.string("Long", "", options=["Long","Short"], group=g_j, inline="j2")
+j2l  = input.int(1, "Lots", minval=1, group=g_j, inline="j2")
+j2e  = input.float(0.0, "Entry", group=g_j, inline="j2")
+
+j3on = input.bool(false, "Enable", group=g_j, inline="j3")
+j3s  = input.string("",  "Symbol", group=g_j, inline="j3")
+j3d  = input.string("Long", "", options=["Long","Short"], group=g_j, inline="j3")
+j3l  = input.int(1, "Lots", minval=1, group=g_j, inline="j3")
+j3e  = input.float(0.0, "Entry", group=g_j, inline="j3")
+
+j4on = input.bool(false, "Enable", group=g_j, inline="j4")
+j4s  = input.string("",  "Symbol", group=g_j, inline="j4")
+j4d  = input.string("Long", "", options=["Long","Short"], group=g_j, inline="j4")
+j4l  = input.int(1, "Lots", minval=1, group=g_j, inline="j4")
+j4e  = input.float(0.0, "Entry", group=g_j, inline="j4")
+
+j5on = input.bool(false, "Enable", group=g_j, inline="j5")
+j5s  = input.string("",  "Symbol", group=g_j, inline="j5")
+j5d  = input.string("Long", "", options=["Long","Short"], group=g_j, inline="j5")
+j5l  = input.int(1, "Lots", minval=1, group=g_j, inline="j5")
+j5e  = input.float(0.0, "Entry", group=g_j, inline="j5")
+
+j1c = f_clean(j1s)
+j2c = f_clean(j2s)
+j3c = f_clean(j3s)
+j4c = f_clean(j4s)
+j5c = f_clean(j5s)
+j1p = request.security(exPrefix + ":" + j1c + "1!", timeframe.period, close, ignore_invalid_symbol=true)
+j2p = request.security(exPrefix + ":" + j2c + "1!", timeframe.period, close, ignore_invalid_symbol=true)
+j3p = request.security(exPrefix + ":" + j3c + "1!", timeframe.period, close, ignore_invalid_symbol=true)
+j4p = request.security(exPrefix + ":" + j4c + "1!", timeframe.period, close, ignore_invalid_symbol=true)
+j5p = request.security(exPrefix + ":" + j5c + "1!", timeframe.period, close, ignore_invalid_symbol=true)
+
+jOn   = array.from(j1on, j2on, j3on, j4on, j5on)
+jSymC = array.from(j1c,  j2c,  j3c,  j4c,  j5c)
+jSide = array.from(j1d,  j2d,  j3d,  j4d,  j5d)
+jLot  = array.from(j1l,  j2l,  j3l,  j4l,  j5l)
+jEnt  = array.from(j1e,  j2e,  j3e,  j4e,  j5e)
+jPx   = array.from(j1p,  j2p,  j3p,  j4p,  j5p)
+
+// ----------------------------------------------------------------------------
+//  DRAW ACTIVE TRADE ON CHART (last bar only)
+// ----------------------------------------------------------------------------
+var line  lnE = na
+var line  lnS = na
+var line  lnT = na
+var box   bxR = na
+var box   bxP = na
+var label lbE = na
+
+if barstate.islast
+    for l in array.from(lnE, lnS, lnT)
+        line.delete(l)
+    box.delete(bxR)
+    box.delete(bxP)
+    label.delete(lbE)
+
+    if placed
+        lnE := line.new(entryT, entryP, timenow, entryP, xloc=xloc.bar_time, color=color.new(color.blue, 0), width=2, extend=extend.right)
+        lnS := line.new(entryT, slP, timenow, slP, xloc=xloc.bar_time, color=color.new(#ef5350, 0), width=2, style=line.style_dashed, extend=extend.right)
+        if tgtP > 0
+            lnT := line.new(entryT, tgtP, timenow, tgtP, xloc=xloc.bar_time, color=color.new(#26a69a, 0), width=2, style=line.style_dashed, extend=extend.right)
+        if showZones
+            bxR := box.new(entryT, math.max(entryP, slP), timenow, math.min(entryP, slP), xloc=xloc.bar_time, border_width=0, bgcolor=color.new(#ef5350, 85))
+            if tgtP > 0
+                bxP := box.new(entryT, math.max(entryP, tgtP), timenow, math.min(entryP, tgtP), xloc=xloc.bar_time, border_width=0, bgcolor=color.new(#26a69a, 85))
+        pnlTag = lotFound ? f_money(netPnl) : "lot size? ⚠"
+        stTag  = closed ? "  [" + result + "]" : inTrade ? "" : "  [PENDING]"
+        lbTxt  = "⭕CTC " + (isLong ? "LONG " : "SHORT ") + baseSym + "  " + pnlTag + stTag
+        lbE := label.new(timenow, entryP, lbTxt, xloc=xloc.bar_time, style=label.style_label_left, color=f_pnlCol(netPnl), textcolor=color.white, size=tSize)
+
+// ----------------------------------------------------------------------------
+//  INFO PANEL (last bar only)
+// ----------------------------------------------------------------------------
+var table pnl = table.new(f_pos(panelPos), 2, 24, border_width=1, frame_width=1, frame_color=color.new(color.gray, 50))
+
+f_row(int r, string k, string v, color vc) =>
+    table.cell(pnl, 0, r, k, text_color=color.new(color.gray, 0), bgcolor=color.new(color.black, 15), text_size=tSize, text_halign=text.align_left)
+    table.cell(pnl, 1, r, v, text_color=vc, bgcolor=color.new(color.black, 15), text_size=tSize, text_halign=text.align_right)
+
+f_hdr(int r, string txtL) =>
+    table.cell(pnl, 0, r, txtL, text_color=color.white, bgcolor=color.new(color.orange, 20), text_size=tSize, text_halign=text.align_left)
+    table.cell(pnl, 1, r, "", bgcolor=color.new(color.orange, 20), text_size=tSize)
+
+if barstate.islast
+    table.clear(pnl, 0, 0, 1, 23)
+    table.cell(pnl, 0, 0, "⭕ CIRCLES TRADERS CLUB", text_color=color.white, bgcolor=color.new(color.blue, 0), text_size=tSize, text_halign=text.align_left)
+    table.cell(pnl, 1, 0, "PAPER PRO", text_color=color.white, bgcolor=color.new(color.blue, 0), text_size=tSize, text_halign=text.align_right)
+
+    ceTxt = na(ceAgo) ? "—" : ceAgo == 0 ? "NOW 🔥🔥" : ceAgo <= sigLook ? str.tostring(ceAgo) + " bars ago 🔥" : "—"
+    peTxt = na(peAgo) ? "—" : peAgo == 0 ? "NOW 🔥🔥" : peAgo <= sigLook ? str.tostring(peAgo) + " bars ago 🔥" : "—"
+    sqTxt = sqzOn ? "SQUEEZE ON ⚡ get ready" : na(relAgo) ? "—" : relAgo == 0 ? "RELEASED NOW 🔥" : relAgo <= sigLook ? "released " + str.tostring(relAgo) + " bars ago" : "—"
+    ceCol = ceTxt == "—" ? color.gray : #26a69a
+    peCol = peTxt == "—" ? color.gray : #ef5350
+    sqCol = sqTxt == "—" ? color.gray : color.orange
+
+    if not placed
+        f_row(1, "Symbol", baseSym + " (" + chartTag + ")", color.white)
+        f_row(2, "Lot size", lotFound ? str.tostring(lotSize) + (lotOv > 0 ? " (manual)" : " (auto)") : "not found ⚠", lotFound ? color.white : color.orange)
+        f_row(3, "LTP", str.tostring(curPrice, format.mintick), color.white)
+        f_row(4, "Front-month fut", na(futInfo) ? "—" : str.tostring(futInfo, format.mintick), color.silver)
+        f_row(5, "How to place", "Click Entry, then Stop,", color.aqua)
+        f_row(6, "", "then Target, then entry time", color.aqua)
+        f_hdr(7, "⭕ OPPORTUNITY SCANNER")
+        f_row(8,  "Buy CE (momentum)", ceTxt, ceCol)
+        f_row(9,  "Buy PE (momentum)", peTxt, peCol)
+        f_row(10, "Straddle window", sqTxt, sqCol)
+        f_row(11, "Never miss a move", "Set alerts on this indicator", color.aqua)
+    else
+        f_row(1,  "Symbol", baseSym + " (" + chartTag + ")", color.white)
+        f_row(2,  "Side", isLong ? "LONG" : "SHORT", isLong ? #26a69a : #ef5350)
+        f_row(3,  "Lot size", str.tostring(lotSize) + (lotOv > 0 ? " (manual)" : lotFound ? " (auto)" : " ⚠"), lotFound ? color.white : color.orange)
+        f_row(4,  "Lots x size = Qty", str.tostring(lotsIn) + " x " + str.tostring(lotSize) + " = " + str.tostring(qty), color.white)
+        f_row(5,  "Entry", str.tostring(entryP, format.mintick), color.white)
+        f_row(6,  "LTP", str.tostring(curPrice, format.mintick), color.white)
+        f_row(7,  "Front-month fut", na(futInfo) ? "—" : str.tostring(futInfo, format.mintick), color.silver)
+        f_row(8,  "Stop-loss", str.tostring(slP, format.mintick), #ef5350)
+        f_row(9,  "Target", tgtP > 0 ? str.tostring(tgtP, format.mintick) : "—", #26a69a)
+        f_row(10, "Risk / unit", str.tostring(riskUnit, format.mintick), color.white)
+        f_row(11, "Planned R:R", na(rrPlan) ? "—" : "1 : " + str.tostring(rrPlan, "#.##"), color.white)
+        f_row(12, "Live R-multiple", na(curR) ? "—" : str.tostring(curR, "#.##") + "R", f_pnlCol(curR))
+        f_row(13, "Risk amount", lotFound ? f_money(riskRs) : "set lot override ⚠", lotFound ? #ef5350 : color.orange)
+        f_row(14, closed ? "P&L (final)" : "P&L (live)", lotFound ? f_money(netPnl) : "set lot override ⚠", lotFound ? f_pnlCol(netPnl) : color.orange)
+        f_row(15, "P&L %", na(pnlPct) ? "—" : str.tostring(pnlPct, "#.##") + "%", na(pnlPct) ? color.gray : f_pnlCol(netPnl))
+        f_row(16, "Days held", str.tostring(daysHeld), color.white)
+        f_row(17, "Status", closed ? result : inTrade ? "RUNNING" : "PENDING (before entry)", closed ? (result == "TARGET HIT" ? #26a69a : #ef5350) : inTrade ? color.aqua : color.yellow)
+        f_row(18, "Reason", reason == "" ? "—" : reason, color.silver)
+        f_hdr(19, "⭕ OPPORTUNITY SCANNER")
+        f_row(20, "Buy CE (momentum)", ceTxt, ceCol)
+        f_row(21, "Buy PE (momentum)", peTxt, peCol)
+        f_row(22, "Straddle window", sqTxt, sqCol)
+
+// ----------------------------------------------------------------------------
+//  ⭕ OPTION ENGINE TABLE (last bar only) — live premiums + IV + Greeks
+// ----------------------------------------------------------------------------
+var table ot = table.new(f_pos(optPos), 4, 15, border_width=1, frame_width=1, frame_color=color.new(color.gray, 50))
+
+f_orow(int r, string lbl, string v1, string v2, string vn, color c1, color c2, color cn) =>
+    bgc = color.new(color.black, 15)
+    table.cell(ot, 0, r, lbl, text_color=color.new(color.gray, 0), bgcolor=bgc, text_size=tSize, text_halign=text.align_left)
+    table.cell(ot, 1, r, v1, text_color=c1, bgcolor=bgc, text_size=tSize, text_halign=text.align_right)
+    table.cell(ot, 2, r, v2, text_color=c2, bgcolor=bgc, text_size=tSize, text_halign=text.align_right)
+    table.cell(ot, 3, r, vn, text_color=cn, bgcolor=bgc, text_size=tSize, text_halign=text.align_right)
+
+if barstate.islast and optOn
+    table.clear(ot, 0, 0, 3, 14)
+    hb = color.new(color.purple, 0)
+    table.cell(ot, 0, 0, "⭕ CTC OPTION ENGINE", text_color=color.white, bgcolor=hb, text_size=tSize, text_halign=text.align_left)
+    table.cell(ot, 1, 0, "Leg 1", text_color=color.white, bgcolor=hb, text_size=tSize, text_halign=text.align_right)
+    table.cell(ot, 2, 0, "Leg 2", text_color=color.white, bgcolor=hb, text_size=tSize, text_halign=text.align_right)
+    table.cell(ot, 3, 0, "NET",   text_color=color.white, bgcolor=hb, text_size=tSize, text_halign=text.align_right)
+
+    spotS = close
+    tYr   = math.max((optExp - timenow) / 31536000000.0, 0.0)
+    dte   = (optExp - timenow) / 86400000.0
+
+    has1  = lg1On and not na(lg1Ltp) and lg1Ltp > 0
+    has2  = lg2On and not na(lg2Ltp) and lg2Ltp > 0
+
+    // IV only from the LIVE premium — never from a stale entry price
+    ivPx1 = has1 ? lg1Ltp : na
+    ivPx2 = has2 ? lg2Ltp : na
+    iv1   = lg1On ? f_iv(ivPx1, spotS, lg1K, tYr, rf, lg1Type == "CE") : na
+    iv2   = lg2On ? f_iv(ivPx2, spotS, lg2K, tYr, rf, lg2Type == "CE") : na
+
+    float dl1 = na
+    float gm1 = na
+    float th1 = na
+    float vg1 = na
+    if not na(iv1)
+        [a1, b1, c1, e1] = f_greeks(spotS, lg1K, tYr, rf, iv1, lg1Type == "CE")
+        dl1 := a1
+        gm1 := b1
+        th1 := c1
+        vg1 := e1
+    float dl2 = na
+    float gm2 = na
+    float th2 = na
+    float vg2 = na
+    if not na(iv2)
+        [a2, b2, c2x, e2] = f_greeks(spotS, lg2K, tYr, rf, iv2, lg2Type == "CE")
+        dl2 := a2
+        gm2 := b2
+        th2 := c2x
+        vg2 := e2
+
+    oq    = lotSize * optLots
+    pnl1  = lg1On and lg1Entry > 0 and has1 ? (lg1Ltp - lg1Entry) * oq : na
+    pnl2  = lg2On and lg2Entry > 0 and has2 ? (lg2Ltp - lg2Entry) * oq : na
+    pct1  = not na(pnl1) ? (lg1Ltp - lg1Entry) / lg1Entry * 100 : na
+    pct2  = not na(pnl2) ? (lg2Ltp - lg2Entry) / lg2Entry * 100 : na
+    netP  = (na(pnl1) and na(pnl2)) ? na : nz(pnl1) + nz(pnl2)
+
+    prem1 = lg1On ? (lg1Entry > 0 ? lg1Entry : has1 ? lg1Ltp : na) : na
+    prem2 = lg2On ? (lg2Entry > 0 ? lg2Entry : has2 ? lg2Ltp : na) : na
+    // combined figures need EVERY enabled leg to have a premium — no partial sums
+    totOk  = (lg1On or lg2On) and (not lg1On or not na(prem1)) and (not lg2On or not na(prem2))
+    totPr  = totOk ? nz(prem1) + nz(prem2) : na
+    ltpOk  = (lg1On or lg2On) and (not lg1On or has1) and (not lg2On or has2)
+    ltpNet = ltpOk ? nz(lg1On ? lg1Ltp : na) + nz(lg2On ? lg2Ltp : na) : na
+    be1   = not na(prem1) ? (lg1Type == "CE" ? lg1K + prem1 : lg1K - prem1) : na
+    be2   = not na(prem2) ? (lg2Type == "CE" ? lg2K + prem2 : lg2K - prem2) : na
+
+    bothL = lg1On and lg2On
+    mixed = bothL and lg1Type != lg2Type
+    strat = bothL ? (mixed ? (lg1K == lg2K ? "LONG STRADDLE" : "LONG STRANGLE") : "2x LONG " + lg1Type) : lg1On ? "LONG " + lg1Type : lg2On ? "LONG " + lg2Type : "—"
+    ceK2  = lg1Type == "CE" ? lg1K : lg2K
+    peK2  = lg1Type == "PE" ? lg1K : lg2K
+    beNet = mixed and not na(totPr) and totPr > 0 ? str.tostring(peK2 - totPr, format.mintick) + " / " + str.tostring(ceK2 + totPr, format.mintick) : "—"
+
+    // display strings with an explicit warning when the lot size is unknown
+    pnl1S = not lotFound ? "lot? ⚠" : na(pnl1) ? "—" : f_money(pnl1)
+    pnl2S = not lotFound ? "lot? ⚠" : na(pnl2) ? "—" : f_money(pnl2)
+    netPS = not lotFound ? "lot? ⚠" : na(netP) ? "—" : f_money(netP)
+    th1S  = not lotFound ? "lot? ⚠" : na(th1) ? "—" : f_money(th1 * oq)
+    th2S  = not lotFound ? "lot? ⚠" : na(th2) ? "—" : f_money(th2 * oq)
+    thNS  = not lotFound ? "lot? ⚠" : (na(th1) and na(th2)) ? "—" : f_money((nz(th1) + nz(th2)) * oq)
+    vg1S  = not lotFound ? "lot? ⚠" : na(vg1) ? "—" : f_money(vg1 * oq)
+    vg2S  = not lotFound ? "lot? ⚠" : na(vg2) ? "—" : f_money(vg2 * oq)
+    vgNS  = not lotFound ? "lot? ⚠" : (na(vg1) and na(vg2)) ? "—" : f_money((nz(vg1) + nz(vg2)) * oq)
+    totS  = not lotFound ? "lot? ⚠" : not na(totPr) and totPr > 0 ? f_money(totPr * oq) : "—"
+
+    s1 = lg1On ? lg1Type + " " + f_kStr(lg1K) : "—"
+    s2 = lg2On ? lg2Type + " " + f_kStr(lg2K) : "—"
+    f_orow(1, "Contract", s1, s2, strat, color.white, color.white, color.aqua)
+    f_orow(2, "LTP (live)", lg1On ? (has1 ? str.tostring(lg1Ltp, format.mintick) : "no data ⚠") : "—", lg2On ? (has2 ? str.tostring(lg2Ltp, format.mintick) : "no data ⚠") : "—", na(ltpNet) ? "—" : str.tostring(ltpNet, format.mintick), not lg1On ? color.gray : has1 ? color.white : color.orange, not lg2On ? color.gray : has2 ? color.white : color.orange, color.white)
+    f_orow(3, "Entry premium", lg1On and lg1Entry > 0 ? str.tostring(lg1Entry, format.mintick) : "—", lg2On and lg2Entry > 0 ? str.tostring(lg2Entry, format.mintick) : "—", "", color.white, color.white, color.white)
+    f_orow(4, "P&L ₹ (" + str.tostring(optLots) + "x" + str.tostring(lotSize) + ")", pnl1S, pnl2S, netPS, not lotFound ? color.orange : f_pnlCol(nz(pnl1)), not lotFound ? color.orange : f_pnlCol(nz(pnl2)), not lotFound ? color.orange : f_pnlCol(nz(netP)))
+    f_orow(5, "P&L %", na(pct1) ? "—" : str.tostring(pct1, "#.##") + "%", na(pct2) ? "—" : str.tostring(pct2, "#.##") + "%", "", f_pnlCol(nz(pnl1)), f_pnlCol(nz(pnl2)), color.white)
+    f_orow(6, "IV %", na(iv1) ? "—" : str.tostring(iv1 * 100, "#.#") + "%", na(iv2) ? "—" : str.tostring(iv2 * 100, "#.#") + "%", "", color.yellow, color.yellow, color.white)
+    f_orow(7, "Delta", na(dl1) ? "—" : str.tostring(dl1, "#.###"), na(dl2) ? "—" : str.tostring(dl2, "#.###"), (na(dl1) and na(dl2)) ? "—" : str.tostring(nz(dl1) + nz(dl2), "#.###"), color.white, color.white, color.aqua)
+    f_orow(8, "Gamma", na(gm1) ? "—" : str.tostring(gm1, "#.####"), na(gm2) ? "—" : str.tostring(gm2, "#.####"), "", color.white, color.white, color.white)
+    f_orow(9, "Theta ₹/day (pos)", th1S, th2S, thNS, #ef5350, #ef5350, #ef5350)
+    f_orow(10, "Vega ₹/1% (pos)", vg1S, vg2S, vgNS, color.white, color.white, color.white)
+    f_orow(11, "Breakeven", na(be1) ? "—" : str.tostring(be1, format.mintick), na(be2) ? "—" : str.tostring(be2, format.mintick), beNet, color.white, color.white, color.aqua)
+    f_orow(12, "Days to expiry", dte <= 0 ? "EXPIRED ⚠" : str.tostring(dte, "#.#"), "", "", dte <= 0 ? color.orange : color.white, color.white, color.white)
+    f_orow(13, "Ticker", lg1On ? lg1Tk : "—", lg2On ? lg2Tk : "—", "", color.silver, color.silver, color.white)
+    f_orow(14, "Total premium ₹", "", "", totS, color.white, color.white, not lotFound ? color.orange : color.yellow)
+
+// ----------------------------------------------------------------------------
+//  JOURNAL TABLE (last bar only)
+// ----------------------------------------------------------------------------
+var table jt = table.new(f_pos(jrnPos), 7, 8, border_width=1, frame_width=1, frame_color=color.new(color.gray, 50))
+
+if barstate.islast and showJrn
+    table.clear(jt, 0, 0, 6, 7)
+    jh = array.from("⭕ Symbol", "Side", "Qty", "Entry", "LTP", "P&L ₹", "P&L %")
+    for c = 0 to 6
+        table.cell(jt, c, 0, array.get(jh, c), text_color=color.white, bgcolor=color.new(color.purple, 0), text_size=tSize, text_halign=text.align_left)
+
+    float jNet = 0.0
+    int   jRow = 0
+    for i = 0 to array.size(jOn) - 1
+        sym = array.get(jSymC, i)
+        if array.get(jOn, i) and sym != "" and array.get(jEnt, i) > 0
+            jLong = array.get(jSide, i) == "Long"
+            jls   = f_lot(sym)
+            jq    = jls * array.get(jLot, i)
+            jpx   = array.get(jPx, i)
+            has   = not na(jpx)
+            jent  = array.get(jEnt, i)
+            jper  = jLong ? (jpx - jent) : (jent - jpx)
+            jpnl  = has ? jper * jq : na
+            jpct  = has and jent > 0 and jq > 0 ? jpnl / (jent * jq) * 100 : na
+            okJ   = has and jls > 0
+            if okJ
+                jNet += jpnl
+            jRow += 1
+            bg = jRow % 2 == 0 ? color.new(color.gray, 88) : color.new(color.gray, 82)
+            table.cell(jt, 0, jRow, sym + (jls > 0 ? "" : " ⚠ lot?"), text_color=jls > 0 ? color.white : color.orange, bgcolor=bg, text_size=tSize, text_halign=text.align_left)
+            table.cell(jt, 1, jRow, jLong ? "LONG" : "SHORT", text_color=jLong ? #26a69a : #ef5350, bgcolor=bg, text_size=tSize)
+            table.cell(jt, 2, jRow, str.tostring(array.get(jLot, i)) + "x" + str.tostring(jls) + "=" + str.tostring(jq), text_color=color.white, bgcolor=bg, text_size=tSize)
+            table.cell(jt, 3, jRow, str.tostring(jent), text_color=color.white, bgcolor=bg, text_size=tSize)
+            table.cell(jt, 4, jRow, has ? str.tostring(jpx, format.mintick) : "n/a", text_color=has ? color.white : color.orange, bgcolor=bg, text_size=tSize)
+            table.cell(jt, 5, jRow, okJ ? f_money(jpnl) : "—", text_color=okJ ? f_pnlCol(jpnl) : color.gray, bgcolor=bg, text_size=tSize)
+            table.cell(jt, 6, jRow, na(jpct) ? "—" : str.tostring(jpct, "#.##") + "%", text_color=na(jpct) ? color.gray : f_pnlCol(jpnl), bgcolor=bg, text_size=tSize)
+
+    bookNet = jNet + (placed and inTrade and lotFound ? netPnl : 0.0)
+    tr = jRow + 1
+    table.cell(jt, 0, tr, "BOOK NET (incl. active)", text_color=color.white, bgcolor=color.new(color.black, 0), text_size=tSize, text_halign=text.align_left)
+    table.cell(jt, 1, tr, "", bgcolor=color.new(color.black, 0), text_size=tSize)
+    table.cell(jt, 2, tr, "", bgcolor=color.new(color.black, 0), text_size=tSize)
+    table.cell(jt, 3, tr, "", bgcolor=color.new(color.black, 0), text_size=tSize)
+    table.cell(jt, 4, tr, "", bgcolor=color.new(color.black, 0), text_size=tSize)
+    table.cell(jt, 5, tr, f_money(bookNet), text_color=f_pnlCol(bookNet), bgcolor=color.new(color.black, 0), text_size=tSize)
+    table.cell(jt, 6, tr, "", bgcolor=color.new(color.black, 0), text_size=tSize)
