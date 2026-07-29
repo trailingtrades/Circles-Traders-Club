@@ -37,7 +37,7 @@ export function injectProtections(
   // active subscribers and every access is logged):
   //  - per-student watermark tiled across the page
   //  - right-click / text-selection / print / save shortcuts disabled
-  const watermarkText = `${student.fullName} · ${student.email}`;
+  const watermarkText = `${student.fullName} · Circles Traders Club`;
   const inject = `
 <style id="ctc-protect">
   @media print { body { display: none !important; } }
@@ -68,8 +68,17 @@ export function injectProtections(
 })();
 </script>`;
 
-  if (html.includes("</body>")) {
-    html = html.replace("</body>", `${inject}\n</body>`);
+  // Inject before the LAST </body> — the real document close comes after any
+  // inline scripts, and an uploaded file's script may itself contain the text
+  // "</body>" inside a string literal (e.g. a "download as Word" feature).
+  // Replacing the first occurrence would corrupt that script.
+  const bodyClose = /<\/body\s*>/gi;
+  let lastMatch: RegExpExecArray | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = bodyClose.exec(html)) !== null) lastMatch = m;
+  if (lastMatch) {
+    const idx = lastMatch.index;
+    html = html.slice(0, idx) + inject + "\n" + html.slice(idx);
   } else {
     html += inject;
   }
