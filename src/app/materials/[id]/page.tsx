@@ -26,6 +26,10 @@ export default async function MaterialPage({ params }: { params: Promise<{ id: s
   if (!material) notFound();
 
   const days = daysRemaining(student);
+  // Embedded resources (sheets/videos/links) can be blocked in an iframe by
+  // the viewer's Google login state, browser extensions or network — so we
+  // always offer a direct "open in new tab" escape hatch.
+  const externalUrl = material.type !== "HTML" ? material.url : null;
 
   let body: React.ReactNode;
   if (material.type === "HTML") {
@@ -47,14 +51,27 @@ export default async function MaterialPage({ params }: { params: Promise<{ id: s
         detail: `Material: ${material.title}`,
       });
       body = (
-        <iframe
-          src={embed}
-          title={material.title}
-          className="w-full flex-1 border-0 bg-white"
-          allow="autoplay; encrypted-media; picture-in-picture"
-          allowFullScreen
-          referrerPolicy="no-referrer"
-        />
+        <div className="relative flex flex-1 flex-col">
+          <iframe
+            src={embed}
+            title={material.title}
+            className="w-full flex-1 border-0 bg-white"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+            referrerPolicy="no-referrer"
+          />
+          <p className="border-t border-ink-700 bg-ink-900 px-4 py-1.5 text-center text-xs text-ink-400">
+            Not loading?{" "}
+            <a
+              href={material.url ?? "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-brand-500 hover:text-brand-400"
+            >
+              Open in a new tab ↗
+            </a>
+          </p>
+        </div>
       );
     } else {
       body = (
@@ -86,6 +103,16 @@ export default async function MaterialPage({ params }: { params: Promise<{ id: s
           <span className="truncate text-sm font-semibold text-white">{material.title}</span>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          {externalUrl && (
+            <a
+              href={externalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary !px-3 !py-1 text-xs"
+            >
+              Open in new tab ↗
+            </a>
+          )}
           <span className={`hidden text-xs sm:inline ${days <= 7 ? "text-amber-400" : "text-ink-400"}`}>
             {days <= 7 ? `⚠️ ${days} day${days === 1 ? "" : "s"} left` : student.fullName}
           </span>
